@@ -17,6 +17,7 @@ echo "Region: $REGION"
 
 # Update kubeconfig
 aws eks update-kubeconfig --region $REGION --name $CLUSTER_NAME --profile corebank
+aws eks update-kubeconfig --region ap-northeast-2 --name banking-platform-corebank-eks --profile corebank
 
 # Replace placeholders in the YAML file
 sed "s/\${EFS_ID}/$EFS_ID/g" efs-writer.yaml > efs-writer-deploy.yaml
