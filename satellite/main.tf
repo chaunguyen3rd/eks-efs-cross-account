@@ -119,25 +119,6 @@ module "eks" {
 
   # Enable IRSA
   enable_irsa = true
-
-  cluster_addons = {
-    coredns = {
-      most_recent = true
-    }
-    kube-proxy = {
-      most_recent = true
-    }
-    vpc-cni = {
-      most_recent = true
-    }
-    aws-ebs-csi-driver = {
-      most_recent = true
-    }
-    aws-efs-csi-driver = {
-      most_recent              = true
-      service_account_role_arn = aws_iam_role.efs_cross_account.arn
-    }
-  }
 }
 
 # Accept VPC peering connection from corebank
@@ -167,52 +148,6 @@ resource "aws_route" "public_to_corebank" {
   vpc_peering_connection_id = var.corebank_peering_connection_id
 
   depends_on = [aws_vpc_peering_connection_accepter.from_corebank]
-}
-
-# IAM Role for cross-account EFS access
-resource "aws_iam_role" "efs_cross_account" {
-  name = "${var.project_name}-efs-cross-account-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRoleWithWebIdentity"
-        Effect = "Allow"
-        Principal = {
-          Federated = module.eks.oidc_provider_arn
-        }
-        Condition = {
-          StringEquals = {
-            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:default:efs-reader-sa"
-            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
-          }
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy" "efs_cross_account" {
-  name = "${var.project_name}-efs-cross-account-policy"
-  role = aws_iam_role.efs_cross_account.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "elasticfilesystem:DescribeFileSystems",
-          "elasticfilesystem:DescribeMountTargets",
-          "elasticfilesystem:DescribeAccessPoints",
-          "elasticfilesystem:CreateAccessPoint",
-          "elasticfilesystem:DeleteAccessPoint"
-        ]
-        Resource = "arn:aws:efs:${var.aws_region}:${var.corebank_account_id}:file-system/${var.corebank_efs_id}"
-      }
-    ]
-  })
 }
 
 # Security group for EFS access to corebank
