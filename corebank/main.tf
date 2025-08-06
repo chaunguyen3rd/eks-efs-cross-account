@@ -237,6 +237,15 @@ resource "aws_efs_file_system_policy" "cross_account" {
     Version = "2012-10-17"
     Statement = [
       {
+        Sid    = "AllowCorebankAccountAccess"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "*"
+        Resource = aws_efs_file_system.main.arn
+      },
+      {
         Sid    = "AllowCrossAccountAccess"
         Effect = "Allow"
         Principal = {
