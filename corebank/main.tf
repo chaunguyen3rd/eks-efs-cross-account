@@ -120,9 +120,6 @@ module "eks" {
   # Enable IRSA
   enable_irsa = true
 
-  # Cluster access entry
-  enable_cluster_creator_admin_permissions = true
-
   cluster_addons = {
     coredns = {
       most_recent = true
