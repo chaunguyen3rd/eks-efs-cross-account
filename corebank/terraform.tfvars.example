@@ -1,0 +1,22 @@
+# Copy this file to terraform.tfvars and update with your values
+
+# AWS Configuration
+aws_region  = "us-west-2"
+aws_profile = "corebank"
+
+# Environment
+environment  = "production"
+project_name = "banking-platform"
+
+# EKS Configuration
+kubernetes_version = "1.27"
+
+# Network Configuration
+vpc_cidr        = "10.0.0.0/16"
+private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+
+# Satellite Account Configuration
+satellite_account_id = "123456789012"  # Replace with actual satellite account ID
+satellite_vpc_id     = "vpc-xxxxxxxxx" # Replace with actual satellite VPC ID (will be output from satellite deployment)
+satellite_vpc_cidr   = "10.1.0.0/16"
