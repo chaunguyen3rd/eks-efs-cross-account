@@ -229,6 +229,50 @@ resource "aws_iam_role_policy_attachment" "efs_csi_driver" {
   role       = aws_iam_role.efs_csi_driver.name
 }
 
+# Additional IAM policy for EFS CSI driver with enhanced permissions
+resource "aws_iam_policy" "efs_csi_driver_enhanced" {
+  name        = "${var.project_name}-efs-csi-driver-enhanced-policy"
+  description = "Enhanced policy for EFS CSI driver with cross-account and access point permissions"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticfilesystem:CreateAccessPoint",
+          "elasticfilesystem:DeleteAccessPoint",
+          "elasticfilesystem:DescribeAccessPoints",
+          "elasticfilesystem:DescribeFileSystems",
+          "elasticfilesystem:DescribeMountTargets",
+          "elasticfilesystem:TagResource",
+          "elasticfilesystem:UntagResource",
+          "elasticfilesystem:ListTagsForResource"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticfilesystem:CreateAccessPoint",
+          "elasticfilesystem:DeleteAccessPoint"
+        ]
+        Resource = aws_efs_file_system.main.arn
+        Condition = {
+          StringEquals = {
+            "elasticfilesystem:AccessedViaMountTarget" = "true"
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "efs_csi_driver_enhanced" {
+  policy_arn = aws_iam_policy.efs_csi_driver_enhanced.arn
+  role       = aws_iam_role.efs_csi_driver.name
+}
+
 # Cross-account resource policy for EFS
 resource "aws_efs_file_system_policy" "cross_account" {
   file_system_id = aws_efs_file_system.main.id
@@ -243,6 +287,22 @@ resource "aws_efs_file_system_policy" "cross_account" {
           AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
         }
         Action   = "elasticfilesystem:*"
+        Resource = aws_efs_file_system.main.arn
+      },
+      {
+        Sid    = "AllowEFSCSIDriverRole"
+        Effect = "Allow"
+        Principal = {
+          AWS = aws_iam_role.efs_csi_driver.arn
+        }
+        Action = [
+          "elasticfilesystem:CreateAccessPoint",
+          "elasticfilesystem:DeleteAccessPoint",
+          "elasticfilesystem:DescribeAccessPoints",
+          "elasticfilesystem:DescribeFileSystems",
+          "elasticfilesystem:TagResource",
+          "elasticfilesystem:UntagResource"
+        ]
         Resource = aws_efs_file_system.main.arn
       },
       {

@@ -24,14 +24,7 @@ spec:
   resources:
     requests:
       storage: 10Gi
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: efs-writer-sa
-  namespace: default
-  annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::590183822512:role/banking-platform-efs-csi-driver-role # Replace with actual role ARN
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -50,7 +43,6 @@ spec:
       labels:
         app: efs-writer
     spec:
-      serviceAccountName: efs-writer-sa
       containers:
         - name: writer
           image: alpine:latest
