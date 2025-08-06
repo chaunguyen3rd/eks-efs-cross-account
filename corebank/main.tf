@@ -298,8 +298,6 @@ resource "aws_efs_file_system_policy" "cross_account" {
         Action = [
           "elasticfilesystem:CreateAccessPoint",
           "elasticfilesystem:DeleteAccessPoint",
-          "elasticfilesystem:DescribeAccessPoints",
-          "elasticfilesystem:DescribeFileSystems",
           "elasticfilesystem:TagResource",
           "elasticfilesystem:UntagResource"
         ]
