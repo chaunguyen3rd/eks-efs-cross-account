@@ -242,7 +242,7 @@ resource "aws_efs_file_system_policy" "cross_account" {
         Principal = {
           AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
         }
-        Action   = "*"
+        Action   = "elasticfilesystem:*"
         Resource = aws_efs_file_system.main.arn
       },
       {
