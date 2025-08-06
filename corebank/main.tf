@@ -236,21 +236,18 @@ resource "aws_efs_file_system_policy" "cross_account" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "AllowCrosAccountAccess"
+        Sid    = "AllowCrossAccountAccess"
         Effect = "Allow"
         Principal = {
           AWS = "arn:aws:iam::${var.satellite_account_id}:root"
         }
         Action = [
-          "elasticfilesystem:DescribeFileSystems",
-          "elasticfilesystem:DescribeMountTargets",
-          "elasticfilesystem:DescribeAccessPoints",
           "elasticfilesystem:CreateAccessPoint",
           "elasticfilesystem:DeleteAccessPoint",
           "elasticfilesystem:TagResource",
           "elasticfilesystem:UntagResource"
         ]
-        Resource = "*"
+        Resource = aws_efs_file_system.main.arn
       }
     ]
   })
