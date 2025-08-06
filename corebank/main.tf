@@ -20,13 +20,13 @@ terraform {
 provider "aws" {
   region  = var.aws_region
   profile = var.aws_profile
-  
+
   default_tags {
     tags = {
-      Environment   = var.environment
-      Project       = var.project_name
-      Account       = "corebank"
-      ManagedBy     = "terraform"
+      Environment = var.environment
+      Project     = var.project_name
+      Account     = "corebank"
+      ManagedBy   = "terraform"
     }
   }
 }
@@ -61,7 +61,7 @@ data "aws_availability_zones" "available" {}
 
 # VPC Configuration
 module "vpc" {
-  source = "terraform-aws-modules/vpc/aws"
+  source  = "terraform-aws-modules/vpc/aws"
   version = "~> 5.0"
 
   name = "${var.project_name}-corebank-vpc"
@@ -96,9 +96,9 @@ module "eks" {
   cluster_endpoint_public_access  = true
   cluster_endpoint_private_access = true
 
-  vpc_id                         = module.vpc.vpc_id
-  subnet_ids                     = module.vpc.private_subnets
-  control_plane_subnet_ids       = module.vpc.private_subnets
+  vpc_id                   = module.vpc.vpc_id
+  subnet_ids               = module.vpc.private_subnets
+  control_plane_subnet_ids = module.vpc.private_subnets
 
   # EKS Managed Node Groups
   eks_managed_node_groups = {
@@ -144,8 +144,8 @@ resource "aws_efs_file_system" "main" {
   creation_token = "${var.project_name}-corebank-efs"
   encrypted      = true
 
-  performance_mode = "generalPurpose"
-  throughput_mode  = "provisioned"
+  performance_mode                = "generalPurpose"
+  throughput_mode                 = "provisioned"
   provisioned_throughput_in_mibps = 100
 
   lifecycle_policy {
