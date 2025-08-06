@@ -224,7 +224,7 @@ resource "aws_iam_role" "efs_csi_driver" {
 }
 
 resource "aws_iam_role_policy_attachment" "efs_csi_driver" {
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEFSClientFullAccess"
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy"
   role       = aws_iam_role.efs_csi_driver.name
 }
 
