@@ -271,37 +271,3 @@ resource "aws_iam_role_policy_attachment" "efs_cross_account" {
   role       = aws_iam_role.efs_cross_account.name
   policy_arn = aws_iam_policy.efs_cross_account_policy.arn
 }
-
-# IAM Role for EFS Application Service Account
-resource "aws_iam_role" "efs_app" {
-  name = "${var.project_name}-satellite-efs-app-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRoleWithWebIdentity"
-        Effect = "Allow"
-        Principal = {
-          Federated = module.eks.oidc_provider_arn
-        }
-        Condition = {
-          StringEquals = {
-            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:default:efs-app-sa"
-            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
-          }
-        }
-      }
-    ]
-  })
-
-  tags = {
-    Name = "${var.project_name}-satellite-efs-app-role"
-  }
-}
-
-# Attach the cross-account policy to the app role as well
-resource "aws_iam_role_policy_attachment" "efs_app" {
-  role       = aws_iam_role.efs_app.name
-  policy_arn = aws_iam_policy.efs_cross_account_policy.arn
-}
