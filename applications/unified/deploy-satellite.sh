@@ -25,7 +25,6 @@ envsubst < efs-app.yaml | kubectl apply -f -
 echo "Checking deployment status..."
 kubectl get pods -l app=efs-app
 kubectl get pvc efs-pvc
-kubectl get pv efs-pv
 
 echo "Deployment completed for satellite cluster!"
 echo "To check logs: kubectl logs -l app=efs-app -f"
