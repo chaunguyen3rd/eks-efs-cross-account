@@ -241,29 +241,6 @@ resource "aws_iam_role_policy_attachment" "efs_app" {
   policy_arn = aws_iam_policy.efs_app_policy.arn
 }
 
-# EFS Resource Policy to allow cross-account access
-resource "aws_efs_file_system_policy" "main" {
-  file_system_id = aws_efs_file_system.main.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Principal = {
-          AWS = "arn:aws:iam::${var.satellite_account_id}:root"
-        }
-        Action = [
-          "elasticfilesystem:ClientMount",
-          "elasticfilesystem:ClientWrite",
-          "elasticfilesystem:ClientRootAccess"
-        ]
-        Resource = aws_efs_file_system.main.arn
-      }
-    ]
-  })
-}
-
 # EFS File System
 resource "aws_efs_file_system" "main" {
   creation_token = "${var.project_name}-corebank-efs"
