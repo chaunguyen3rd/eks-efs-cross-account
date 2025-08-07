@@ -11,7 +11,7 @@ echo "Deploying EFS Application to Satellite Cluster..."
 export CLUSTER_TYPE="satellite"
 export APP_NAME="satellite-app"
 export EFS_ID="fs-041b4bd54a0879aca"
-export EFS_ROLE_ARN="$SATELLITE_CROSS_ACCOUNT_ROLE_ARN"
+export EFS_ROLE_ARN="arn:aws:iam::471112932773:role/banking-satellite-efs-cross-account-role"
 
 echo "Configuration:"
 echo "  Cluster Type: $CLUSTER_TYPE"
