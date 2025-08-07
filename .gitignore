@@ -45,3 +45,5 @@ node_modules/
 # Temporary files
 *.tmp
 *~
+
+test.yaml

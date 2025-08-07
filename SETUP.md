@@ -3,17 +3,20 @@
 ## Prerequisites
 
 ### 1. AWS Accounts Setup
+
 - Two AWS accounts: one for "corebank" and one for "satellite"
 - Administrative access to both accounts
 - Cross-account trust relationships configured
 
 ### 2. Required Tools
+
 - Terraform >= 1.0
 - AWS CLI >= 2.0
 - kubectl >= 1.21
 - bash shell
 
 ### 3. AWS CLI Profiles
+
 Configure AWS CLI profiles for both accounts:
 
 ```bash
@@ -27,7 +30,9 @@ aws configure --profile satellite
 ```
 
 ### 4. IAM Permissions
+
 Both accounts need the following permissions:
+
 - EKS full access
 - VPC full access
 - EFS full access
@@ -37,8 +42,10 @@ Both accounts need the following permissions:
 ## Configuration Steps
 
 ### 1. Corebank Account Configuration
+
 1. Copy `corebank/terraform.tfvars.example` to `corebank/terraform.tfvars`
 2. Update the following values:
+
    ```hcl
    aws_region  = "us-west-2"  # Your preferred region
    aws_profile = "corebank"   # Your AWS profile name
@@ -46,6 +53,7 @@ Both accounts need the following permissions:
    ```
 
 ### 2. Initial Deployment
+
 First, deploy only the corebank infrastructure:
 
 ```bash
@@ -56,13 +64,16 @@ terraform apply
 ```
 
 Note the following outputs:
+
 - `vpc_id`
 - `vpc_peering_connection_id`
 - `efs_id`
 
 ### 3. Satellite Account Configuration
+
 1. Copy `satellite/terraform.tfvars.example` to `satellite/terraform.tfvars`
 2. Update with values from corebank deployment:
+
    ```hcl
    aws_region  = "us-west-2"  # Same region as corebank
    aws_profile = "satellite"  # Your AWS profile name
@@ -72,6 +83,7 @@ Note the following outputs:
    ```
 
 ### 4. Complete Deployment
+
 Deploy satellite infrastructure:
 
 ```bash
@@ -82,6 +94,7 @@ terraform apply
 ```
 
 ### 5. Application Deployment
+
 Deploy the applications to both clusters:
 
 ```bash
@@ -97,6 +110,7 @@ cd ../reader
 ## Verification
 
 ### Check EKS Clusters
+
 ```bash
 # Corebank cluster
 aws eks list-clusters --profile corebank --region us-west-2
@@ -106,19 +120,21 @@ aws eks list-clusters --profile satellite --region us-west-2
 ```
 
 ### Check Applications
+
 ```bash
 # Connect to corebank cluster
-aws eks update-kubeconfig --region us-west-2 --name banking-platform-corebank-eks --profile corebank
+aws eks update-kubeconfig --region ap-northeast-2 --name banking-platform-corebank-eks --profile corebank
 kubectl get pods -l app=efs-writer
 kubectl logs -l app=efs-writer -f
 
 # Connect to satellite cluster
-aws eks update-kubeconfig --region us-west-2 --name banking-platform-satellite-eks --profile satellite
+aws eks update-kubeconfig --region ap-northeast-2 --name banking-satellite-eks --profile satellite
 kubectl get pods -l app=efs-reader
 kubectl logs -l app=efs-reader -f
 ```
 
 ### Verify Cross-Account EFS Access
+
 The reader application in the satellite account should be able to read files written by the writer application in the corebank account.
 
 ## Troubleshooting
@@ -154,3 +170,76 @@ aws ec2 describe-vpc-peering-connections --profile corebank
 kubectl describe pod <pod-name>
 kubectl get events --sort-by=.metadata.creationTimestamp
 ```
+
+aws iam create-role \
+     --role-name EFSCrossAccountAccessRole \
+     --assume-role-policy-document file://iam_trust.json \
+     --profile corebank
+
+curl -s <https://raw.githubusercontent.com/kubernetes-sigs/aws-efs-csi-driver/master/examples/kubernetes/cross_account_mount/iam-policy-examples/describe-mount-target-example.json> -o describe_mt.json
+
+"Resource" : "arn:aws:elasticfilesystem:ap-northeast-2:590183822512:file-system/fs-041b4bd54a0879aca"
+
+aws iam create-policy \
+    --policy-name EFSDescribeMountTargetIAMPolicy \
+    --policy-document file://describe_mt.json \
+    --profile corebank
+
+aws iam attach-role-policy \
+    --role-name EFSCrossAccountAccessRole \
+    --policy-arn "arn:aws:iam::590183822512:policy/EFSDescribeMountTargetIAMPolicy" \
+    --profile corebank
+
+{
+  "Version": "2012-10-17",
+  "Statement": {
+    "Effect": "Allow",
+    "Action": "sts:AssumeRole",
+    "Resource": "arn:aws:iam::590183822512:role/EFSCrossAccountAccessRole"
+  }
+}
+
+aws iam create-policy \
+    --policy-name AssumeEFSRoleInAccountB \
+    --policy-document file://iam_assume.json \
+    --profile satellite
+
+ROLE="banking-satellite-efs-cross-account-role"
+
+aws iam attach-role-policy \
+    --role-name $ROLE \
+    --policy-arn "arn:aws:iam::471112932773:policy/AssumeEFSRoleInAccountB" \
+    --profile satellite
+
+kubectl create secret generic x-account \
+        --namespace=kube-system \
+        --from-literal=awsRoleArn="arn:aws:iam::590183822512:role/EFSCrossAccountAccessRole"
+
+{
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "elasticfilesystem:ClientMount",
+                "elasticfilesystem:ClientWrite"
+            ],
+            "Principal": {
+                "AWS": "arn:aws:iam::471112932773:root"
+            }
+        }
+    ]
+}
+
+aws efs put-file-system-policy --file-system-id fs-041b4bd54a0879aca \
+    --policy file://file-system-policy.json \
+    --profile corebank
+
+eksctl create iamserviceaccount \
+  --cluster=banking-satellite-eks \
+  --region ap-northeast-2 \
+  --namespace=kube-system \
+  --name=efs-csi-node-sa \
+  --override-existing-serviceaccounts \
+  --attach-policy-arn=arn:aws:iam::aws:policy/AmazonElasticFileSystemClientFullAccess \
+  --approve \
+  --profile satellite
