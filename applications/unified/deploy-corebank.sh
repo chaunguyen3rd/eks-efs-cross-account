@@ -11,7 +11,7 @@ echo "Deploying EFS Application to Corebank Cluster..."
 export CLUSTER_TYPE="corebank"
 export APP_NAME="corebank-app"
 export EFS_ID="fs-041b4bd54a0879aca"
-export EFS_ROLE_ARN="eksctl-banking-platform-corebank-eks-addon-ia-Role1-kculBYtTrAAc"
+export EFS_ROLE_ARN="arn:aws:iam::590183822512:role/banking-platform-corebank-efs-csi-driver-role"
 
 echo "Configuration:"
 echo "  Cluster Type: $CLUSTER_TYPE"

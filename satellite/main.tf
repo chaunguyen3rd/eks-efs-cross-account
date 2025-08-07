@@ -111,13 +111,48 @@ module "eks" {
       most_recent = true
     }
     vpc-cni = {
-      most_recent = true
+      most_recent              = true
+      service_account_role_arn = aws_iam_role.vpc_cni.arn
     }
     aws-efs-csi-driver = {
       most_recent              = true
       service_account_role_arn = aws_iam_role.efs_cross_account.arn
     }
   }
+}
+
+# IAM Role for VPC CNI
+resource "aws_iam_role" "vpc_cni" {
+  name = "${var.project_name}-satellite-vpc-cni-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Effect = "Allow"
+        Principal = {
+          Federated = module.eks.oidc_provider_arn
+        }
+        Condition = {
+          StringEquals = {
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:kube-system:aws-node"
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name = "${var.project_name}-satellite-vpc-cni-role"
+  }
+}
+
+# Attach AWS managed policy for VPC CNI
+resource "aws_iam_role_policy_attachment" "vpc_cni" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  role       = aws_iam_role.vpc_cni.name
 }
 
 # Accept VPC peering connection from corebank
