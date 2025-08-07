@@ -89,3 +89,8 @@ output "node_groups" {
   description = "EKS node groups"
   value       = module.eks.eks_managed_node_groups
 }
+
+output "efs_role_arn" {
+  description = "ARN of the IAM role for EFS application access"
+  value       = aws_iam_role.efs_app.arn
+}

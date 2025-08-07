@@ -10,10 +10,6 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.20"
     }
-    helm = {
-      source  = "hashicorp/helm"
-      version = "~> 2.10"
-    }
   }
 }
 
@@ -39,19 +35,6 @@ provider "kubernetes" {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "aws"
     args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--profile", var.aws_profile]
-  }
-}
-
-provider "helm" {
-  kubernetes {
-    host                   = module.eks.cluster_endpoint
-    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
-
-    exec {
-      api_version = "client.authentication.k8s.io/v1beta1"
-      command     = "aws"
-      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--profile", var.aws_profile]
-    }
   }
 }
 
@@ -131,6 +114,10 @@ module "eks" {
       most_recent              = true
       service_account_role_arn = aws_iam_role.vpc_cni.arn
     }
+    aws-efs-csi-driver = {
+      most_recent              = true
+      service_account_role_arn = aws_iam_role.efs_csi_driver.arn
+    }
   }
 }
 
@@ -161,6 +148,120 @@ resource "aws_iam_role" "vpc_cni" {
 resource "aws_iam_role_policy_attachment" "vpc_cni" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
   role       = aws_iam_role.vpc_cni.name
+}
+
+# IAM Role for EFS CSI Driver
+resource "aws_iam_role" "efs_csi_driver" {
+  name = "${var.project_name}-corebank-efs-csi-driver-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Effect = "Allow"
+        Principal = {
+          Federated = module.eks.oidc_provider_arn
+        }
+        Condition = {
+          StringEquals = {
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:kube-system:efs-csi-controller-sa"
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name = "${var.project_name}-corebank-efs-csi-driver-role"
+  }
+}
+
+# Attach AWS managed policy for EFS CSI Driver
+resource "aws_iam_role_policy_attachment" "efs_csi_driver" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy"
+  role       = aws_iam_role.efs_csi_driver.name
+}
+
+# IAM Role for EFS Application Service Account
+resource "aws_iam_role" "efs_app" {
+  name = "${var.project_name}-corebank-efs-app-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Effect = "Allow"
+        Principal = {
+          Federated = module.eks.oidc_provider_arn
+        }
+        Condition = {
+          StringEquals = {
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:default:efs-app-sa"
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name = "${var.project_name}-corebank-efs-app-role"
+  }
+}
+
+# IAM Policy for EFS Application
+resource "aws_iam_policy" "efs_app_policy" {
+  name        = "${var.project_name}-corebank-efs-app-policy"
+  description = "Policy for EFS application access in corebank"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticfilesystem:ClientMount",
+          "elasticfilesystem:ClientWrite",
+          "elasticfilesystem:ClientRootAccess",
+          "elasticfilesystem:DescribeFileSystems",
+          "elasticfilesystem:DescribeMountTargets"
+        ]
+        Resource = aws_efs_file_system.main.arn
+      }
+    ]
+  })
+}
+
+# Attach the policy to the role
+resource "aws_iam_role_policy_attachment" "efs_app" {
+  role       = aws_iam_role.efs_app.name
+  policy_arn = aws_iam_policy.efs_app_policy.arn
+}
+
+# EFS Resource Policy to allow cross-account access
+resource "aws_efs_file_system_policy" "main" {
+  file_system_id = aws_efs_file_system.main.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${var.satellite_account_id}:root"
+        }
+        Action = [
+          "elasticfilesystem:ClientMount",
+          "elasticfilesystem:ClientWrite",
+          "elasticfilesystem:ClientRootAccess"
+        ]
+        Resource = aws_efs_file_system.main.arn
+      }
+    ]
+  })
 }
 
 # EFS File System
@@ -248,4 +349,164 @@ resource "aws_route" "public_to_satellite" {
   route_table_id            = module.vpc.public_route_table_ids[count.index]
   destination_cidr_block    = var.satellite_vpc_cidr
   vpc_peering_connection_id = aws_vpc_peering_connection.to_satellite.id
+}
+
+# IAM Role for EFS CSI Driver
+resource "aws_iam_role" "efs_csi_driver" {
+  name = "${var.project_name}-corebank-efs-csi-driver-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Effect = "Allow"
+        Principal = {
+          Federated = module.eks.oidc_provider_arn
+        }
+        Condition = {
+          StringEquals = {
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:kube-system:efs-csi-controller-sa"
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name = "${var.project_name}-corebank-efs-csi-driver-role"
+  }
+}
+
+# IAM Policy for EFS CSI Driver
+resource "aws_iam_policy" "efs_csi_driver_policy" {
+  name        = "${var.project_name}-corebank-efs-csi-driver-policy"
+  description = "Policy for EFS CSI driver in corebank"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticfilesystem:DescribeAccessPoints",
+          "elasticfilesystem:DescribeFileSystems",
+          "elasticfilesystem:DescribeMountTargets",
+          "ec2:DescribeAvailabilityZones"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticfilesystem:CreateAccessPoint"
+        ]
+        Resource = "*"
+        Condition = {
+          StringLike = {
+            "aws:RequestedRegion" = var.aws_region
+          }
+        }
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticfilesystem:DeleteAccessPoint"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "elasticfilesystem:AccessedViaMountTarget" = "true"
+          }
+        }
+      }
+    ]
+  })
+}
+
+# Attach the policy to the role
+resource "aws_iam_role_policy_attachment" "efs_csi_driver" {
+  role       = aws_iam_role.efs_csi_driver.name
+  policy_arn = aws_iam_policy.efs_csi_driver_policy.arn
+}
+
+# IAM Role for EFS Application Service Account
+resource "aws_iam_role" "efs_app" {
+  name = "${var.project_name}-corebank-efs-app-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Effect = "Allow"
+        Principal = {
+          Federated = module.eks.oidc_provider_arn
+        }
+        Condition = {
+          StringEquals = {
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:default:efs-app-sa"
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name = "${var.project_name}-corebank-efs-app-role"
+  }
+}
+
+# IAM Policy for EFS Application
+resource "aws_iam_policy" "efs_app_policy" {
+  name        = "${var.project_name}-corebank-efs-app-policy"
+  description = "Policy for EFS application access in corebank"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticfilesystem:ClientMount",
+          "elasticfilesystem:ClientWrite",
+          "elasticfilesystem:ClientRootAccess",
+          "elasticfilesystem:DescribeFileSystems",
+          "elasticfilesystem:DescribeMountTargets"
+        ]
+        Resource = aws_efs_file_system.main.arn
+      }
+    ]
+  })
+}
+
+# Attach the policy to the role
+resource "aws_iam_role_policy_attachment" "efs_app" {
+  role       = aws_iam_role.efs_app.name
+  policy_arn = aws_iam_policy.efs_app_policy.arn
+}
+
+# EFS Resource Policy to allow cross-account access
+resource "aws_efs_file_system_policy" "main" {
+  file_system_id = aws_efs_file_system.main.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${var.satellite_account_id}:root"
+        }
+        Action = [
+          "elasticfilesystem:ClientMount",
+          "elasticfilesystem:ClientWrite",
+          "elasticfilesystem:ClientRootAccess"
+        ]
+        Resource = aws_efs_file_system.main.arn
+      }
+    ]
+  })
 }

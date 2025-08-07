@@ -61,7 +61,17 @@ output "public_subnets" {
 }
 
 output "efs_cross_account_role_arn" {
-  description = "ARN of the IAM role for cross-account EFS access"
+  description = "ARN of the IAM role for cross-account EFS CSI driver"
+  value       = aws_iam_role.efs_cross_account.arn
+}
+
+output "cross_account_role_arn" {
+  description = "ARN of the IAM role for cross-account EFS application access"
+  value       = aws_iam_role.efs_app.arn
+}
+
+output "cross_account_role_arn" {
+  description = "ARN of the IAM role for cross-account EFS access (alias)"
   value       = aws_iam_role.efs_cross_account.arn
 }
 

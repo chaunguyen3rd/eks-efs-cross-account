@@ -10,10 +10,6 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.20"
     }
-    helm = {
-      source  = "hashicorp/helm"
-      version = "~> 2.10"
-    }
   }
 }
 
@@ -39,19 +35,6 @@ provider "kubernetes" {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "aws"
     args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--profile", var.aws_profile]
-  }
-}
-
-provider "helm" {
-  kubernetes {
-    host                   = module.eks.cluster_endpoint
-    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
-
-    exec {
-      api_version = "client.authentication.k8s.io/v1beta1"
-      command     = "aws"
-      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--profile", var.aws_profile]
-    }
   }
 }
 
@@ -119,6 +102,22 @@ module "eks" {
 
   # Enable IRSA
   enable_irsa = true
+
+  cluster_addons = {
+    coredns = {
+      most_recent = true
+    }
+    kube-proxy = {
+      most_recent = true
+    }
+    vpc-cni = {
+      most_recent = true
+    }
+    aws-efs-csi-driver = {
+      most_recent              = true
+      service_account_role_arn = aws_iam_role.efs_cross_account.arn
+    }
+  }
 }
 
 # Accept VPC peering connection from corebank
@@ -173,4 +172,101 @@ resource "aws_security_group" "efs_client" {
   tags = {
     Name = "${var.project_name}-efs-client-sg"
   }
+}
+
+# IAM Role for Cross-Account EFS Access
+resource "aws_iam_role" "efs_cross_account" {
+  name = "${var.project_name}-satellite-efs-cross-account-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Effect = "Allow"
+        Principal = {
+          Federated = module.eks.oidc_provider_arn
+        }
+        Condition = {
+          StringEquals = {
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:kube-system:efs-csi-controller-sa"
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name = "${var.project_name}-satellite-efs-cross-account-role"
+  }
+}
+
+# Attach AWS managed policy for EFS CSI Driver
+resource "aws_iam_role_policy_attachment" "efs_csi_driver" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy"
+  role       = aws_iam_role.efs_cross_account.name
+}
+
+# Additional policy for cross-account EFS access
+resource "aws_iam_policy" "efs_cross_account_policy" {
+  name        = "${var.project_name}-satellite-efs-cross-account-policy"
+  description = "Policy for cross-account EFS access from satellite to corebank"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticfilesystem:ClientMount",
+          "elasticfilesystem:ClientWrite",
+          "elasticfilesystem:ClientRootAccess",
+          "elasticfilesystem:DescribeFileSystems",
+          "elasticfilesystem:DescribeMountTargets"
+        ]
+        Resource = "arn:aws:efs:${var.aws_region}:${var.corebank_account_id}:file-system/${var.corebank_efs_id}"
+      }
+    ]
+  })
+}
+
+# Attach the cross-account policy to the role
+resource "aws_iam_role_policy_attachment" "efs_cross_account" {
+  role       = aws_iam_role.efs_cross_account.name
+  policy_arn = aws_iam_policy.efs_cross_account_policy.arn
+}
+
+# IAM Role for EFS Application Service Account
+resource "aws_iam_role" "efs_app" {
+  name = "${var.project_name}-satellite-efs-app-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Effect = "Allow"
+        Principal = {
+          Federated = module.eks.oidc_provider_arn
+        }
+        Condition = {
+          StringEquals = {
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:default:efs-app-sa"
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name = "${var.project_name}-satellite-efs-app-role"
+  }
+}
+
+# Attach the cross-account policy to the app role as well
+resource "aws_iam_role_policy_attachment" "efs_app" {
+  role       = aws_iam_role.efs_app.name
+  policy_arn = aws_iam_policy.efs_cross_account_policy.arn
 }

@@ -7,22 +7,10 @@ set -e
 
 echo "Deploying EFS Application to Satellite Cluster..."
 
-# Check if required environment variables are set
-if [ -z "$EFS_ID" ]; then
-    echo "Error: EFS_ID environment variable is required"
-    echo "Please set it with: export EFS_ID=fs-xxxxxx"
-    exit 1
-fi
-
-if [ -z "$SATELLITE_CROSS_ACCOUNT_ROLE_ARN" ]; then
-    echo "Error: SATELLITE_CROSS_ACCOUNT_ROLE_ARN environment variable is required"
-    echo "Please set it with: export SATELLITE_CROSS_ACCOUNT_ROLE_ARN=arn:aws:iam::xxxxx:role/xxxxx"
-    exit 1
-fi
-
 # Set cluster-specific variables
 export CLUSTER_TYPE="satellite"
 export APP_NAME="satellite-app"
+export EFS_ID="fs-041b4bd54a0879aca"
 export EFS_ROLE_ARN="$SATELLITE_CROSS_ACCOUNT_ROLE_ARN"
 
 echo "Configuration:"
