@@ -273,9 +273,11 @@ resource "aws_efs_file_system_policy" "main" {
           AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
         }
         Action = [
-          "elasticfilesystem:*"
+          "elasticfilesystem:ClientMount",
+          "elasticfilesystem:ClientWrite",
+          "elasticfilesystem:ClientRootAccess"
         ]
-        Resource = "*"
+        Resource = aws_efs_file_system.main.arn
       },
       {
         Sid    = "AllowSatelliteAccountAccess"
@@ -286,14 +288,9 @@ resource "aws_efs_file_system_policy" "main" {
         Action = [
           "elasticfilesystem:ClientMount",
           "elasticfilesystem:ClientWrite",
-          "elasticfilesystem:ClientRootAccess",
-          "elasticfilesystem:DescribeFileSystems",
-          "elasticfilesystem:DescribeMountTargets",
-          "elasticfilesystem:DescribeAccessPoints",
-          "elasticfilesystem:CreateAccessPoint",
-          "elasticfilesystem:DeleteAccessPoint"
+          "elasticfilesystem:ClientRootAccess"
         ]
-        Resource = "*"
+        Resource = aws_efs_file_system.main.arn
       }
     ]
   })
