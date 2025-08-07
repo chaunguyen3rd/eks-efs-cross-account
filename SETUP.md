@@ -246,7 +246,7 @@ eksctl create iamserviceaccount \
 
 eksctl create iamserviceaccount \
   --cluster=banking-platform-corebank-eks \
-  --namespace=default \
+  --namespace=kube-system \
   --name=efs-app-sa \
   --attach-role-arn=arn:aws:iam::590183822512:role/corebank-test-role \
   --override-existing-serviceaccounts \
