@@ -278,7 +278,7 @@ resource "aws_efs_file_system_policy" "main" {
         Resource = "*"
       },
       {
-        Sid    = "AllowSatelliteAccountFullAccess"
+        Sid    = "AllowSatelliteAccountAccess"
         Effect = "Allow"
         Principal = {
           AWS = "arn:aws:iam::${var.satellite_account_id}:root"
@@ -292,27 +292,6 @@ resource "aws_efs_file_system_policy" "main" {
           "elasticfilesystem:DescribeAccessPoints",
           "elasticfilesystem:CreateAccessPoint",
           "elasticfilesystem:DeleteAccessPoint"
-        ]
-        Resource = "*"
-        Condition = {
-          Bool = {
-            "aws:SecureTransport" = "false"
-          }
-        }
-      },
-      {
-        Sid    = "AllowSatelliteEKSServiceAccounts"
-        Effect = "Allow"
-        Principal = {
-          AWS = "arn:aws:iam::${var.satellite_account_id}:role/${var.project_name}-satellite-efs-cross-account-role"
-        }
-        Action = [
-          "elasticfilesystem:ClientMount",
-          "elasticfilesystem:ClientWrite",
-          "elasticfilesystem:ClientRootAccess",
-          "elasticfilesystem:DescribeFileSystems",
-          "elasticfilesystem:DescribeMountTargets",
-          "elasticfilesystem:DescribeAccessPoints"
         ]
         Resource = "*"
       }
