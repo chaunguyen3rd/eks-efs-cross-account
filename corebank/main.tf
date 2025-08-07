@@ -223,40 +223,6 @@ resource "aws_security_group" "efs" {
   }
 }
 
-# Cross-account resource policy for EFS
-resource "aws_efs_file_system_policy" "cross_account" {
-  file_system_id = aws_efs_file_system.main.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowCorebankAccountAccess"
-        Effect = "Allow"
-        Principal = {
-          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
-        }
-        Action   = "elasticfilesystem:*"
-        Resource = aws_efs_file_system.main.arn
-      },
-      {
-        Sid    = "AllowCrossAccountAccess"
-        Effect = "Allow"
-        Principal = {
-          AWS = "arn:aws:iam::${var.satellite_account_id}:root"
-        }
-        Action = [
-          "elasticfilesystem:CreateAccessPoint",
-          "elasticfilesystem:DeleteAccessPoint",
-          "elasticfilesystem:TagResource",
-          "elasticfilesystem:UntagResource"
-        ]
-        Resource = aws_efs_file_system.main.arn
-      }
-    ]
-  })
-}
-
 # VPC Peering with satellite account (this needs to be accepted in satellite account)
 resource "aws_vpc_peering_connection" "to_satellite" {
   peer_owner_id = var.satellite_account_id
