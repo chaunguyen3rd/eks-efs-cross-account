@@ -1,4 +1,20 @@
 ---
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: efs-sc
+provisioner: efs.csi.aws.com
+mountOptions:
+  - tls
+  - iam
+parameters:
+  provisioningMode: efs-ap
+  fileSystemId: fs-041b4bd54a0879aca
+  directoryPerms: "700"
+  az: us-east-1a
+  csi.storage.k8s.io/provisioner-secret-name: x-account
+  csi.storage.k8s.io/provisioner-secret-namespace: kube-system
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
