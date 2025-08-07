@@ -74,3 +74,8 @@ output "node_groups" {
   description = "EKS node groups"
   value       = module.eks.eks_managed_node_groups
 }
+
+output "efs_cross_account_role_arn" {
+  description = "ARN of the IAM role for cross-account EFS access (supports both controller and node service accounts)"
+  value       = aws_iam_role.efs_cross_account.arn
+}

@@ -45,6 +45,11 @@ output "efs_id" {
   value       = aws_efs_file_system.main.id
 }
 
+output "efs_arn" {
+  description = "ARN of the EFS file system"
+  value       = aws_efs_file_system.main.arn
+}
+
 output "efs_dns_name" {
   description = "DNS name of the EFS file system"
   value       = aws_efs_file_system.main.dns_name

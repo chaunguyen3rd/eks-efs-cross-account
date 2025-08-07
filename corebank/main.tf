@@ -259,6 +259,67 @@ resource "aws_efs_file_system" "main" {
   }
 }
 
+# EFS File System Policy for Cross-Account Access
+resource "aws_efs_file_system_policy" "main" {
+  file_system_id = aws_efs_file_system.main.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowCorebankFullAccess"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action = [
+          "elasticfilesystem:*"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "AllowSatelliteAccountFullAccess"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${var.satellite_account_id}:root"
+        }
+        Action = [
+          "elasticfilesystem:ClientMount",
+          "elasticfilesystem:ClientWrite",
+          "elasticfilesystem:ClientRootAccess",
+          "elasticfilesystem:DescribeFileSystems",
+          "elasticfilesystem:DescribeMountTargets",
+          "elasticfilesystem:DescribeAccessPoints",
+          "elasticfilesystem:CreateAccessPoint",
+          "elasticfilesystem:DeleteAccessPoint"
+        ]
+        Resource = "*"
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
+      },
+      {
+        Sid    = "AllowSatelliteEKSServiceAccounts"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${var.satellite_account_id}:role/${var.project_name}-satellite-efs-cross-account-role"
+        }
+        Action = [
+          "elasticfilesystem:ClientMount",
+          "elasticfilesystem:ClientWrite",
+          "elasticfilesystem:ClientRootAccess",
+          "elasticfilesystem:DescribeFileSystems",
+          "elasticfilesystem:DescribeMountTargets",
+          "elasticfilesystem:DescribeAccessPoints"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 # EFS Mount Targets
 resource "aws_efs_mount_target" "main" {
   count           = length(module.vpc.private_subnets)

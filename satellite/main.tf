@@ -224,7 +224,11 @@ resource "aws_iam_role" "efs_cross_account" {
         }
         Condition = {
           StringEquals = {
-            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:kube-system:efs-csi-controller-sa"
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = [
+              "system:serviceaccount:kube-system:efs-csi-controller-sa",
+              "system:serviceaccount:kube-system:efs-csi-node-sa",
+              "system:serviceaccount:default:efs-app-sa"
+            ]
             "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
           }
         }
@@ -258,7 +262,10 @@ resource "aws_iam_policy" "efs_cross_account_policy" {
           "elasticfilesystem:ClientWrite",
           "elasticfilesystem:ClientRootAccess",
           "elasticfilesystem:DescribeFileSystems",
-          "elasticfilesystem:DescribeMountTargets"
+          "elasticfilesystem:DescribeMountTargets",
+          "elasticfilesystem:DescribeAccessPoints",
+          "elasticfilesystem:CreateAccessPoint",
+          "elasticfilesystem:DeleteAccessPoint"
         ]
         Resource = "arn:aws:efs:${var.aws_region}:${var.corebank_account_id}:file-system/${var.corebank_efs_id}"
       }
