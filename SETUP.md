@@ -213,7 +213,7 @@ aws iam attach-role-policy \
 
 kubectl create secret generic x-account \
         --namespace=kube-system \
-        --from-literal=awsRoleArn="arn:aws:iam::590183822512:role/corebank-test-role"
+        --from-literal=awsRoleArn="arn:aws:iam::590183822512:role/EFSSameAccountAccessRole"
 
 {
     "Statement": [
@@ -235,14 +235,14 @@ aws efs put-file-system-policy --file-system-id fs-041b4bd54a0879aca \
     --profile corebank
 
 eksctl create iamserviceaccount \
-  --cluster=banking-satellite-eks \
+  --cluster=banking-platform-corebank-eks \
   --region ap-northeast-2 \
   --namespace=kube-system \
   --name=efs-csi-node-sa \
   --override-existing-serviceaccounts \
   --attach-policy-arn=arn:aws:iam::aws:policy/AmazonElasticFileSystemClientFullAccess \
   --approve \
-  --profile satellite
+  --profile corebank
 
 eksctl create iamserviceaccount \
   --cluster=banking-platform-corebank-eks \
