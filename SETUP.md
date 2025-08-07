@@ -212,8 +212,8 @@ aws iam attach-role-policy \
     --profile satellite
 
 kubectl create secret generic x-account \
-        --namespace=kube-system \
-        --from-literal=awsRoleArn="arn:aws:iam::590183822512:role/EFSCrossAccountAccessRole"
+        --namespace=default \
+        --from-literal=awsRoleArn="arn:aws:iam::590183822512:role/corebank-test-role"
 
 {
     "Statement": [
@@ -243,3 +243,13 @@ eksctl create iamserviceaccount \
   --attach-policy-arn=arn:aws:iam::aws:policy/AmazonElasticFileSystemClientFullAccess \
   --approve \
   --profile satellite
+
+eksctl create iamserviceaccount \
+  --cluster=banking-platform-corebank-eks \
+  --namespace=default \
+  --name=efs-app-sa \
+  --attach-role-arn=arn:aws:iam::590183822512:role/corebank-test-role \
+  --override-existing-serviceaccounts \
+  --approve \
+  --region=ap-northeast-2 \
+  --profile corebank

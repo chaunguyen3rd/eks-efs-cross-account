@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: efs-app-sa
+  namespace: default
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::590183822512:role/corebank-test-role"
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: efs-sc-with-sa
+provisioner: efs.csi.aws.com
+mountOptions:
+  - tls
+  - iam
+parameters:
+  provisioningMode: efs-ap
+  fileSystemId: "fs-041b4bd54a0879aca"
+  directoryPerms: "0755"
+  csi.storage.k8s.io/provisioner-secret-name: x-account
+  csi.storage.k8s.io/provisioner-secret-namespace: default
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: efs-claim-with-sa
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: efs-sc-with-sa
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: efs-app-with-sa
+  namespace: default
+  labels:
+    app: efs-app-sa
+spec:
+  serviceAccountName: efs-app-sa # Link pod to service account
+  containers:
+    - name: app
+      image: busybox
+      command: ["/bin/sh"]
+      args: ["-c", "while true; do echo $(date -u) >> /data/out; sleep 5; done"]
+      volumeMounts:
+        - name: persistent-storage
+          mountPath: /data
+      env:
+        - name: AWS_ROLE_ARN
+          value: "${EFS_ROLE_ARN}"
+        - name: AWS_WEB_IDENTITY_TOKEN_FILE
+          value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
+      resources:
+        requests:
+          memory: "64Mi"
+          cpu: "50m"
+        limits:
+          memory: "128Mi"
+          cpu: "100m"
+  volumes:
+    - name: persistent-storage
+      persistentVolumeClaim:
+        claimName: efs-claim-with-sa
