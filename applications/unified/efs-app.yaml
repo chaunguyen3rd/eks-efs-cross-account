@@ -21,6 +21,9 @@ kind: StorageClass
 metadata:
   name: efs-sc
 provisioner: efs.csi.aws.com
+mountOptions:
+  - tls
+  - iam
 parameters:
   provisioningMode: efs-ap
   fileSystemId: "${EFS_ID}"
