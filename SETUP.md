@@ -212,7 +212,7 @@ aws iam attach-role-policy \
     --profile satellite
 
 kubectl create secret generic x-account \
-        --namespace=default \
+        --namespace=kube-system \
         --from-literal=awsRoleArn="arn:aws:iam::590183822512:role/corebank-test-role"
 
 {

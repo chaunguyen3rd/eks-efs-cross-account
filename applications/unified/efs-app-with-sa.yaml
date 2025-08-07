@@ -42,18 +42,6 @@ spec:
       volumeMounts:
         - name: persistent-storage
           mountPath: /data
-      env:
-        - name: AWS_ROLE_ARN
-          value: "${EFS_ROLE_ARN}"
-        - name: AWS_WEB_IDENTITY_TOKEN_FILE
-          value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
-      resources:
-        requests:
-          memory: "64Mi"
-          cpu: "50m"
-        limits:
-          memory: "128Mi"
-          cpu: "100m"
   volumes:
     - name: persistent-storage
       persistentVolumeClaim:
