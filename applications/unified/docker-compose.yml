@@ -1,0 +1,20 @@
+# EFS File Upload Application - Docker Compose for Local Testing
+
+version: '3.8'
+
+services:
+  file-upload-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./uploads:/data/uploads
+    environment:
+      - FLASK_ENV=development
+    restart: unless-stopped
+
+volumes:
+  uploads:
+    driver: local

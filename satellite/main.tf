@@ -117,15 +117,6 @@ module "eks" {
     aws-efs-csi-driver = {
       most_recent              = true
       service_account_role_arn = aws_iam_role.efs_cross_account.arn
-      configuration_values = jsonencode({
-        node = {
-          serviceAccount = {
-            annotations = {
-              "eks.amazonaws.com/role-arn" = aws_iam_role.efs_csi_node.arn
-            }
-          }
-        }
-      })
     }
   }
 }
@@ -321,6 +312,19 @@ resource "kubernetes_secret" "x_account" {
   }
 
   type = "Opaque"
+
+  depends_on = [module.eks]
+}
+
+# Kubernetes service account for EFS CSI node
+resource "kubernetes_service_account" "efs_csi_node" {
+  metadata {
+    name      = "efs-csi-node-sa"
+    namespace = "kube-system"
+    annotations = {
+      "eks.amazonaws.com/role-arn" = aws_iam_role.efs_csi_node.arn
+    }
+  }
 
   depends_on = [module.eks]
 }
