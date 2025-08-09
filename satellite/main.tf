@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.20"
     }
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.0"
+    }
   }
 }
 
@@ -316,14 +320,19 @@ resource "kubernetes_secret" "x_account" {
   depends_on = [module.eks]
 }
 
-# Kubernetes service account for EFS CSI node
-resource "kubernetes_service_account" "efs_csi_node" {
-  metadata {
-    name      = "efs-csi-node-sa"
-    namespace = "kube-system"
-    annotations = {
-      "eks.amazonaws.com/role-arn" = aws_iam_role.efs_csi_node.arn
-    }
+# Note: The efs-csi-node-sa service account is automatically created by the EKS add-on
+# We'll use kubectl to annotate it with the IAM role ARN after the cluster is created
+resource "null_resource" "annotate_efs_csi_node_sa" {
+  triggers = {
+    cluster_name = module.eks.cluster_name
+    role_arn     = aws_iam_role.efs_csi_node.arn
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      aws eks update-kubeconfig --region ${var.aws_region} --name ${module.eks.cluster_name} --profile ${var.aws_profile}
+      kubectl annotate serviceaccount efs-csi-node-sa -n kube-system eks.amazonaws.com/role-arn=${aws_iam_role.efs_csi_node.arn} --overwrite
+    EOT
   }
 
   depends_on = [module.eks]
