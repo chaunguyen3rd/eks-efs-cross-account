@@ -117,6 +117,15 @@ module "eks" {
     aws-efs-csi-driver = {
       most_recent              = true
       service_account_role_arn = aws_iam_role.efs_cross_account.arn
+      configuration_values = jsonencode({
+        node = {
+          serviceAccount = {
+            annotations = {
+              "eks.amazonaws.com/role-arn" = aws_iam_role.efs_csi_node.arn
+            }
+          }
+        }
+      })
     }
   }
 }
@@ -209,9 +218,32 @@ resource "aws_security_group" "efs_client" {
   }
 }
 
-# IAM Role for Cross-Account EFS Access
-resource "aws_iam_role" "efs_cross_account" {
-  name = "${var.project_name}-satellite-efs-cross-account-role"
+# Policy to allow assuming the cross-account role in corebank
+resource "aws_iam_policy" "assume_corebank_role" {
+  name        = "${var.project_name}-satellite-assume-corebank-role-policy"
+  description = "Policy to assume cross-account role in corebank account"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "sts:AssumeRole"
+        Resource = "arn:aws:iam::${var.corebank_account_id}:role/${var.project_name}-satellite-cross-account-role"
+      }
+    ]
+  })
+}
+
+# Attach the assume role policy to the EFS cross-account role
+resource "aws_iam_role_policy_attachment" "assume_corebank_role" {
+  role       = aws_iam_role.efs_cross_account.name
+  policy_arn = aws_iam_policy.assume_corebank_role.arn
+}
+
+# IAM Role for EFS CSI Node Service Account (separate from controller)
+resource "aws_iam_role" "efs_csi_node" {
+  name = "${var.project_name}-satellite-efs-csi-node-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -224,11 +256,7 @@ resource "aws_iam_role" "efs_cross_account" {
         }
         Condition = {
           StringEquals = {
-            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = [
-              "system:serviceaccount:kube-system:efs-csi-controller-sa",
-              "system:serviceaccount:kube-system:efs-csi-node-sa",
-              "system:serviceaccount:default:efs-app-sa"
-            ]
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:kube-system:efs-csi-node-sa"
             "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
           }
         }
@@ -237,44 +265,28 @@ resource "aws_iam_role" "efs_cross_account" {
   })
 
   tags = {
-    Name = "${var.project_name}-satellite-efs-cross-account-role"
+    Name = "${var.project_name}-satellite-efs-csi-node-role"
   }
 }
 
-# Attach AWS managed policy for EFS CSI Driver
-resource "aws_iam_role_policy_attachment" "efs_csi_driver" {
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy"
-  role       = aws_iam_role.efs_cross_account.name
+# Attach AmazonElasticFileSystemClientFullAccess to the EFS CSI Node role
+resource "aws_iam_role_policy_attachment" "efs_csi_node_full_access" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonElasticFileSystemClientFullAccess"
+  role       = aws_iam_role.efs_csi_node.name
 }
 
-# Additional policy for cross-account EFS access
-resource "aws_iam_policy" "efs_cross_account_policy" {
-  name        = "${var.project_name}-satellite-efs-cross-account-policy"
-  description = "Policy for cross-account EFS access from satellite to corebank"
+# Kubernetes secret for cross-account role ARN
+resource "kubernetes_secret" "x_account" {
+  metadata {
+    name      = "x-account"
+    namespace = "kube-system"
+  }
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "elasticfilesystem:ClientMount",
-          "elasticfilesystem:ClientWrite",
-          "elasticfilesystem:ClientRootAccess",
-          "elasticfilesystem:DescribeFileSystems",
-          "elasticfilesystem:DescribeMountTargets",
-          "elasticfilesystem:DescribeAccessPoints",
-          "elasticfilesystem:CreateAccessPoint",
-          "elasticfilesystem:DeleteAccessPoint"
-        ]
-        Resource = "arn:aws:efs:${var.aws_region}:${var.corebank_account_id}:file-system/${var.corebank_efs_id}"
-      }
-    ]
-  })
-}
+  data = {
+    awsRoleArn = "arn:aws:iam::${var.corebank_account_id}:role/${var.project_name}-satellite-cross-account-role"
+  }
 
-# Attach the cross-account policy to the role
-resource "aws_iam_role_policy_attachment" "efs_cross_account" {
-  role       = aws_iam_role.efs_cross_account.name
-  policy_arn = aws_iam_policy.efs_cross_account_policy.arn
+  type = "Opaque"
+
+  depends_on = [module.eks]
 }

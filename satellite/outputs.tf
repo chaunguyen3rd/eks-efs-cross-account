@@ -79,3 +79,18 @@ output "efs_cross_account_role_arn" {
   description = "ARN of the IAM role for cross-account EFS access (supports both controller and node service accounts)"
   value       = aws_iam_role.efs_cross_account.arn
 }
+
+output "efs_csi_node_role_arn" {
+  description = "ARN of the IAM role for EFS CSI Node service account"
+  value       = aws_iam_role.efs_csi_node.arn
+}
+
+output "assume_corebank_role_policy_arn" {
+  description = "ARN of the policy that allows assuming corebank cross-account role"
+  value       = aws_iam_policy.assume_corebank_role.arn
+}
+
+output "x_account_secret_name" {
+  description = "Name of the Kubernetes secret containing cross-account role ARN"
+  value       = kubernetes_secret.x_account.metadata[0].name
+}

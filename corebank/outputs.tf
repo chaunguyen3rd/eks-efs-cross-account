@@ -99,3 +99,13 @@ output "efs_role_arn" {
   description = "ARN of the IAM role for EFS application access"
   value       = aws_iam_role.efs_app.arn
 }
+
+output "satellite_cross_account_role_arn" {
+  description = "ARN of the cross-account role for satellite account"
+  value       = aws_iam_role.satellite_cross_account.arn
+}
+
+output "satellite_cross_account_role_name" {
+  description = "Name of the cross-account role for satellite account"
+  value       = aws_iam_role.satellite_cross_account.name
+}
