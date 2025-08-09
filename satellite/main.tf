@@ -164,6 +164,40 @@ resource "aws_iam_role_policy_attachment" "vpc_cni" {
   role       = aws_iam_role.vpc_cni.name
 }
 
+# IAM Role for Cross-Account EFS Access (EFS CSI Controller)
+resource "aws_iam_role" "efs_cross_account" {
+  name = "${var.project_name}-satellite-efs-cross-account-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Effect = "Allow"
+        Principal = {
+          Federated = module.eks.oidc_provider_arn
+        }
+        Condition = {
+          StringEquals = {
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:kube-system:efs-csi-controller-sa"
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name = "${var.project_name}-satellite-efs-cross-account-role"
+  }
+}
+
+# Attach AWS managed policy for EFS CSI Driver to cross-account role
+resource "aws_iam_role_policy_attachment" "efs_cross_account_csi" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy"
+  role       = aws_iam_role.efs_cross_account.name
+}
+
 # Accept VPC peering connection from corebank
 resource "aws_vpc_peering_connection_accepter" "from_corebank" {
   vpc_peering_connection_id = var.corebank_peering_connection_id
