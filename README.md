@@ -1,30 +1,25 @@
 # Multi-Account EKS with EFS Cross-Account Access
 
 This Terraform configuration deploys:
+
 - **Corebank Account**: EKS cluster with EFS and application to write files
 - **Satellite Account**: EKS cluster with application to access EFS in corebank account
 
 ## Architecture
 
-```
-┌─────────────────────────────────────┐    ┌─────────────────────────────────────┐
-│           Corebank Account          │    │          Satellite Account          │
-│                                     │    │                                     │
-│  ┌─────────────────────────────────┐ │    │  ┌─────────────────────────────────┐ │
-│  │           EKS Cluster           │ │    │  │           EKS Cluster           │ │
-│  │                                 │ │    │  │                                 │ │
-│  │  ┌─────────────────────────────┐│ │    │  │  ┌─────────────────────────────┐│ │
-│  │  │   Writer Application        ││ │    │  │  │   Reader Application        ││ │
-│  │  │   (writes to EFS)           ││ │    │  │  │   (reads from EFS)          ││ │
-│  │  └─────────────────────────────┘│ │    │  │  └─────────────────────────────┘│ │
-│  └─────────────────────────────────┘ │    │  └─────────────────────────────────┘ │
-│                                     │    │                                     │
-│  ┌─────────────────────────────────┐ │    │                                     │
-│  │              EFS                │ │◄───┼─────────────────────────────────────┤
-│  │                                 │ │    │         Cross-Account               │
-│  └─────────────────────────────────┘ │    │         Access                      │
-└─────────────────────────────────────┘    └─────────────────────────────────────┘
-```
+For a visual understanding of the architecture and network flow, refer to the following diagrams:
+
+### Cross-Account EFS Architecture
+
+![Cross-Account EFS Simplified](diagrams/cross-account-efs-simplified.png)
+
+This diagram illustrates the high-level architecture showing how the EFS filesystem in the corebank account is accessed by applications in the satellite account.
+
+### Network Flow
+
+![Network Flow Simplified](diagrams/network-flow-simplified.png)
+
+This diagram shows the detailed network flow and connections between the components across the two AWS accounts.
 
 ## Prerequisites
 
@@ -37,6 +32,7 @@ This Terraform configuration deploys:
 ## Deployment Steps
 
 1. **Deploy Corebank Infrastructure**:
+
    ```bash
    cd corebank
    terraform init
@@ -45,6 +41,7 @@ This Terraform configuration deploys:
    ```
 
 2. **Deploy Satellite Infrastructure**:
+
    ```bash
    cd ../satellite
    terraform init
@@ -53,6 +50,7 @@ This Terraform configuration deploys:
    ```
 
 3. **Deploy Applications**:
+
    ```bash
    # Deploy writer app in corebank
    cd ../applications/writer
