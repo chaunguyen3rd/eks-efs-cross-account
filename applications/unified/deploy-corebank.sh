@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Deploy EFS S3 Downloader Application to Corebank Cluster
-# This script deploys the simplified S3 downloader application to the corebank cluster
+# This script deploys the S3 downloader application that uses cross-account EFS access
 
 set -e
 
@@ -9,7 +9,7 @@ echo "Deploying EFS S3 Downloader Application to Corebank Cluster..."
 
 # Set cluster-specific variables
 export CLUSTER_TYPE="corebank"
-export APP_NAME="corebank-s3-downloader"
+export APP_NAME="efs-s3-downloader"
 export EFS_ID="fs-0f9767477ea91786e"
 
 echo "Configuration:"
@@ -17,31 +17,50 @@ echo "  Cluster Type: $CLUSTER_TYPE"
 echo "  App Name: $APP_NAME"
 echo "  EFS ID: $EFS_ID"
 
+# Verify EFS ID is set
+if [[ -z "$EFS_ID" ]]; then
+    echo "❌ Error: EFS_ID is not set. Please provide the EFS file system ID."
+    exit 1
+fi
+
 # Apply the configuration
+echo "Applying Kubernetes manifests..."
 envsubst < efs-app.yaml | kubectl apply -f -
 
 echo "Checking deployment status..."
-kubectl get pods -l app=efs-app
+kubectl get storageclass efs-sc
 kubectl get pvc efs-claim
+kubectl get deployment efs-s3-downloader
 
 echo "Waiting for deployment to be ready..."
 kubectl wait --for=condition=available --timeout=300s deployment/efs-s3-downloader
 
 echo "✅ Deployment completed!"
 echo ""
-echo "To check downloaded files:"
-echo "  kubectl exec -it deployment/efs-s3-downloader -- ls -la /data/downloads/"
+echo "📊 Checking application status:"
+kubectl get pods -l app=efs-app
+
 echo ""
-echo "To access the container:"
-echo "  kubectl exec -it deployment/efs-s3-downloader -- sh"
+echo "🔍 Useful commands:"
+echo "  View application logs (with S3 download status):"
+echo "    kubectl logs -f deployment/efs-s3-downloader"
 echo ""
-echo "To check logs:"
-echo "  kubectl logs -f deployment/efs-s3-downloader"
-echo "  • Get service URL: kubectl get svc efs-app-service"
-echo "  • Access the application through the LoadBalancer endpoint"
+echo "  Check downloaded files in EFS:"
+echo "    kubectl exec -it deployment/efs-s3-downloader -- ls -la /data/"
+echo ""
+echo "  Check EFS mount and disk usage:"
+echo "    kubectl exec -it deployment/efs-s3-downloader -- df -h /data"
+echo ""
+echo "  Access the container shell:"
+echo "    kubectl exec -it deployment/efs-s3-downloader -- sh"
+echo ""
+echo "  Monitor S3 download progress:"
+echo "    kubectl exec -it deployment/efs-s3-downloader -- du -hs /data/*"
 echo ""
 echo "📁 Application Features:"
-echo "  • Upload multiple files (images, documents, videos)"
-echo "  • View uploaded files with metadata"
-echo "  • Download files"
+echo "  • Downloads files from S3 to EFS storage"
+echo "  • Uses cross-account EFS access via x-account secret"
 echo "  • Files stored on EFS for persistence and cross-AZ availability"
+echo "  • Environment variables:"
+echo "    - S3_BUCKET_URL: s3://core-efs-eks-cross-account-public-bucket"
+echo "    - FILES_TO_DOWNLOAD: 21m.011-fall-2024"
