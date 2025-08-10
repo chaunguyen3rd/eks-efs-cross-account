@@ -143,7 +143,7 @@ output "efs_client_security_group_arn" {
 }
 
 # ==============================================
-# IAM Role Outputs - EFS CSI Controller
+# IAM Role Outputs
 # ==============================================
 
 output "vpc_cni_role_arn" {
@@ -164,20 +164,6 @@ output "efs_cross_account_role_arn" {
 output "efs_cross_account_role_name" {
   description = "Name of the IAM role for EFS CSI controller cross-account access"
   value       = aws_iam_role.efs_cross_account.name
-}
-
-# ==============================================
-# IAM Role Outputs - EFS CSI Node
-# ==============================================
-
-output "efs_csi_node_role_arn" {
-  description = "ARN of the IAM role for EFS CSI Node service account"
-  value       = aws_iam_role.efs_csi_node.arn
-}
-
-output "efs_csi_node_role_name" {
-  description = "Name of the IAM role for EFS CSI Node service account"
-  value       = aws_iam_role.efs_csi_node.name
 }
 
 # ==============================================
@@ -245,9 +231,4 @@ output "corebank_account_id" {
 output "corebank_vpc_cidr" {
   description = "Corebank VPC CIDR for cross-account access"
   value       = var.corebank_vpc_cidr
-}
-
-output "corebank_efs_id" {
-  description = "Corebank EFS file system ID for cross-account access"
-  value       = var.corebank_efs_id
 }

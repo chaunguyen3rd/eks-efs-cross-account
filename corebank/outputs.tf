@@ -216,14 +216,24 @@ output "efs_csi_driver_role_name" {
   value       = aws_iam_role.efs_csi_driver.name
 }
 
-output "satellite_cross_account_role_arn" {
-  description = "ARN of the cross-account role for satellite account access"
-  value       = aws_iam_role.satellite_cross_account.arn
+output "cross_account_efs_access_role_arn" {
+  description = "ARN of the cross-account role for EFS access (used by both corebank and satellite)"
+  value       = aws_iam_role.cross_account_efs_access.arn
 }
 
-output "satellite_cross_account_role_name" {
-  description = "Name of the cross-account role for satellite account access"
-  value       = aws_iam_role.satellite_cross_account.name
+output "cross_account_efs_access_role_name" {
+  description = "Name of the cross-account role for EFS access (used by both corebank and satellite)"
+  value       = aws_iam_role.cross_account_efs_access.name
+}
+
+output "efs_csi_assume_cross_account_policy_arn" {
+  description = "ARN of the policy allowing EFS CSI driver to assume cross-account role"
+  value       = aws_iam_policy.efs_csi_assume_cross_account.arn
+}
+
+output "efs_csi_assume_cross_account_policy_name" {
+  description = "Name of the policy allowing EFS CSI driver to assume cross-account role"
+  value       = aws_iam_policy.efs_csi_assume_cross_account.name
 }
 
 # ==============================================
