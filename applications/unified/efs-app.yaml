@@ -51,8 +51,7 @@ spec:
               echo "Starting S3 file download to EFS mount..."
 
               echo "Downloading files..."
-              echo "S3 path: $S3_BUCKET_URL/$FILES_TO_DOWNLOAD/"
-              aws s3 cp "$S3_BUCKET_URL/$FILES_TO_DOWNLOAD/" /data/ --recursive --no-sign-request
+              aws s3 cp s3://core-efs-eks-cross-account-public-bucket/21m.011-fall-2024/ /data/ --recursive --no-sign-request
 
               echo "Download process completed!"
               echo "Files in EFS mount:"
@@ -64,11 +63,6 @@ spec:
           volumeMounts:
             - name: persistent-storage
               mountPath: /data
-          env:
-            - name: S3_BUCKET_URL
-              value: "s3://core-efs-eks-cross-account-public-bucket"
-            - name: FILES_TO_DOWNLOAD
-              value: "21m.011-fall-2024" # Specify files here, space-separated
           resources:
             requests:
               memory: "64Mi"
