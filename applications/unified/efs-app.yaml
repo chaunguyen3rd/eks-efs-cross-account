@@ -56,7 +56,7 @@ spec:
               if [ -n "$FILES_TO_DOWNLOAD" ]; then
                 for file in $FILES_TO_DOWNLOAD; do
                   echo "Downloading $file from $S3_BUCKET_URL..."
-                  if aws s3 cp "$S3_BUCKET_URL/$file" "/data/downloads/$file" --no-sign-request; then
+                  if aws s3 cp "$S3_BUCKET_URL/$file" "/data/downloads/$file" --no-sign-request --recursive; then
                     echo "✓ Successfully downloaded $file"
                     ls -la "/data/downloads/$file"
                   else
