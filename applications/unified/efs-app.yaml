@@ -51,12 +51,13 @@ spec:
               echo "Starting S3 file download to EFS mount..."
 
               echo "Downloading files..."
-              aws s3 cp "$S3_BUCKET_URL/$FILES_TO_DOWNLOAD/" "/data/$FILES_TO_DOWNLOAD/" --recursive --no-sign-request
+              echo "S3 path: $S3_BUCKET_URL/$FILES_TO_DOWNLOAD/"
+              aws s3 cp "$S3_BUCKET_URL/$FILES_TO_DOWNLOAD/" /data/ --recursive --no-sign-request
 
               echo "Download process completed!"
               echo "Files in EFS mount:"
               ls -la /data
-              du -hs /data/$FILES_TO_DOWNLOAD
+              du -hs /data
 
               # Keep container running
               sleep infinity
