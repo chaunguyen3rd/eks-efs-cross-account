@@ -53,19 +53,8 @@ spec:
               # Create download directory
               mkdir -p /data/downloads
 
-              if [ -n "$FILES_TO_DOWNLOAD" ]; then
-                for file in $FILES_TO_DOWNLOAD; do
-                  echo "Downloading $file from $S3_BUCKET_URL..."
-                  if aws s3 cp "$S3_BUCKET_URL/$file" "/data/downloads/$file" --no-sign-request --recursive; then
-                    echo "✓ Successfully downloaded $file"
-                    ls -la "/data/downloads/$file"
-                  else
-                    echo "✗ Failed to download $file"
-                  fi
-                done
-              else
-                echo "No files specified in FILES_TO_DOWNLOAD environment variable"
-              fi
+              echo "Downloading files..."
+              aws s3 cp "$S3_BUCKET_URL/$FILES_TO_DOWNLOAD" "/data/downloads/" --recursive
 
               echo "Download process completed!"
               echo "Files in EFS mount:"
@@ -78,7 +67,7 @@ spec:
               mountPath: /data
           env:
             - name: S3_BUCKET_URL
-              value: "s3://core-efs-eks-cross-account-public-bucket/"
+              value: "s3://core-efs-eks-cross-account-public-bucket"
             - name: FILES_TO_DOWNLOAD
               value: "21m.011-fall-2024" # Specify files here, space-separated
           resources:
