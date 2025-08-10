@@ -11,13 +11,11 @@ echo "Deploying EFS S3 Downloader Application to Satellite Cluster..."
 export CLUSTER_TYPE="satellite"
 export APP_NAME="satellite-s3-downloader"
 export EFS_ID="fs-041b4bd54a0879aca"
-export EFS_ROLE_ARN="arn:aws:iam::471112932773:role/banking-satellite-efs-cross-account-role"
 
 echo "Configuration:"
 echo "  Cluster Type: $CLUSTER_TYPE"
 echo "  App Name: $APP_NAME"
 echo "  EFS ID: $EFS_ID"
-echo "  Role ARN: $EFS_ROLE_ARN"
 
 # Apply the configuration
 envsubst < efs-app.yaml | kubectl apply -f -

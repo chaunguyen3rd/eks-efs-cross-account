@@ -6,7 +6,6 @@ metadata:
 provisioner: efs.csi.aws.com
 mountOptions:
   - tls
-  - iam
 parameters:
   provisioningMode: efs-ap
   fileSystemId: "${EFS_ID}"
@@ -79,9 +78,9 @@ spec:
               mountPath: /data
           env:
             - name: S3_BUCKET_URL
-              value: "s3://your-public-bucket-name"
+              value: "s3://core-efs-eks-cross-account-public-bucket/"
             - name: FILES_TO_DOWNLOAD
-              value: "" # Specify files here, space-separated
+              value: "21m.011-fall-2024" # Specify files here, space-separated
           resources:
             requests:
               memory: "64Mi"

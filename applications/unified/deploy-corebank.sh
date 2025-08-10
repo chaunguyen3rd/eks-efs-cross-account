@@ -11,13 +11,11 @@ echo "Deploying EFS S3 Downloader Application to Corebank Cluster..."
 export CLUSTER_TYPE="corebank"
 export APP_NAME="corebank-s3-downloader"
 export EFS_ID="fs-041b4bd54a0879aca"
-export EFS_ROLE_ARN="arn:aws:iam::590183822512:role/banking-platform-corebank-efs-csi-driver-role"
 
 echo "Configuration:"
 echo "  Cluster Type: $CLUSTER_TYPE"
 echo "  App Name: $APP_NAME"
 echo "  EFS ID: $EFS_ID"
-echo "  Role ARN: $EFS_ROLE_ARN"
 
 # Apply the configuration
 envsubst < efs-app.yaml | kubectl apply -f -
