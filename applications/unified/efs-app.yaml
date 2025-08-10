@@ -54,7 +54,7 @@ spec:
               mkdir -p /data/downloads
 
               echo "Downloading files..."
-              aws s3 cp "$S3_BUCKET_URL/$FILES_TO_DOWNLOAD" "/data/downloads/" --recursive
+              aws s3 cp "$S3_BUCKET_URL/$FILES_TO_DOWNLOAD" "/data/downloads/" --recursive --no-sign-request
 
               echo "Download process completed!"
               echo "Files in EFS mount:"
