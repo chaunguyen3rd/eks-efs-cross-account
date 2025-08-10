@@ -237,6 +237,26 @@ output "efs_csi_assume_cross_account_policy_name" {
 }
 
 # ==============================================
+# Kubernetes Secret Outputs
+# ==============================================
+
+output "x_account_secret_name" {
+  description = "Name of the Kubernetes secret containing cross-account role ARN"
+  value       = kubernetes_secret.x_account.metadata[0].name
+}
+
+output "x_account_secret_namespace" {
+  description = "Namespace of the Kubernetes secret containing cross-account role ARN"
+  value       = kubernetes_secret.x_account.metadata[0].namespace
+}
+
+output "cross_account_role_arn_from_secret" {
+  description = "ARN of the cross-account role from Kubernetes secret"
+  value       = kubernetes_secret.x_account.data["awsRoleArn"]
+  sensitive   = true
+}
+
+# ==============================================
 # Account and Region Information
 # ==============================================
 

@@ -325,3 +325,19 @@ resource "aws_route" "public_to_satellite" {
   destination_cidr_block    = var.satellite_vpc_cidr
   vpc_peering_connection_id = aws_vpc_peering_connection.to_satellite.id
 }
+
+# Kubernetes secret for cross-account role ARN
+resource "kubernetes_secret" "x_account" {
+  metadata {
+    name      = "x-account"
+    namespace = "kube-system"
+  }
+
+  data = {
+    awsRoleArn = aws_iam_role.cross_account_efs_access.arn
+  }
+
+  type = "Opaque"
+
+  depends_on = [module.eks]
+}
