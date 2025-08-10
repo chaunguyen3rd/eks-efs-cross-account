@@ -59,6 +59,7 @@ spec:
               echo "Download process completed!"
               echo "Files in EFS mount:"
               ls -la /data/downloads/
+              du -hs /data/downloads/$FILES_TO_DOWNLOAD
 
               # Keep container running
               sleep infinity
