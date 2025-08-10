@@ -1,15 +1,15 @@
 #!/bin/bash
 
-# Deploy EFS File Upload Application to Corebank Cluster
-# This script deploys the unified file upload application to the corebank cluster
+# Deploy EFS S3 Downloader Application to Corebank Cluster
+# This script deploys the simplified S3 downloader application to the corebank cluster
 
 set -e
 
-echo "Deploying EFS File Upload Application to Corebank Cluster..."
+echo "Deploying EFS S3 Downloader Application to Corebank Cluster..."
 
 # Set cluster-specific variables
 export CLUSTER_TYPE="corebank"
-export APP_NAME="corebank-file-upload"
+export APP_NAME="corebank-s3-downloader"
 export EFS_ID="fs-041b4bd54a0879aca"
 export EFS_ROLE_ARN="arn:aws:iam::590183822512:role/banking-platform-corebank-efs-csi-driver-role"
 
@@ -24,17 +24,21 @@ envsubst < efs-app.yaml | kubectl apply -f -
 
 echo "Checking deployment status..."
 kubectl get pods -l app=efs-app
-kubectl get svc efs-app-service
 kubectl get pvc efs-claim
 
 echo "Waiting for deployment to be ready..."
-kubectl wait --for=condition=available --timeout=300s deployment/efs-file-upload-app
+kubectl wait --for=condition=available --timeout=300s deployment/efs-s3-downloader
 
-echo "Deployment completed for corebank cluster!"
+echo "✅ Deployment completed!"
 echo ""
-echo "📋 Next steps:"
-echo "  • Check deployment: kubectl get pods -l app=efs-app"
-echo "  • View logs: kubectl logs -l app=efs-app -f"
+echo "To check downloaded files:"
+echo "  kubectl exec -it deployment/efs-s3-downloader -- ls -la /data/downloads/"
+echo ""
+echo "To access the container:"
+echo "  kubectl exec -it deployment/efs-s3-downloader -- sh"
+echo ""
+echo "To check logs:"
+echo "  kubectl logs -f deployment/efs-s3-downloader"
 echo "  • Get service URL: kubectl get svc efs-app-service"
 echo "  • Access the application through the LoadBalancer endpoint"
 echo ""

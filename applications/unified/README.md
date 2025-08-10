@@ -1,197 +1,172 @@
-# EFS File Upload Application
+# Simplified EFS S3 Downloader Application
 
-A simple web application that allows users to upload images and files to Amazon EFS (Elastic File System) storage. The application is designed to run on Amazon EKS clusters with cross-account EFS access.
+This is a simplified Kubernetes application that demonstrates downloading files from a public S3 bucket to an Amazon EFS (Elastic File System) mount. The application uses AWS CLI to directly download files to the EFS mount point.
 
-## Features
+## Architecture Overview
 
-- 📤 **Multi-file Upload**: Upload multiple files simultaneously
-- 🖼️ **Image Support**: PNG, JPG, JPEG, GIF formats
-- 📄 **Document Support**: PDF, DOC, DOCX, TXT, XLS, XLSX formats
-- 📦 **Archive Support**: ZIP files
-- 🎥 **Video Support**: MP4, AVI, MOV formats
-- 📊 **File Management**: View uploaded files with metadata (size, upload date)
-- ⬇️ **Download**: Download uploaded files
-- 🔒 **Security**: File type validation and secure filename handling
-- 💾 **Persistent Storage**: Files stored on Amazon EFS for durability and cross-AZ access
-- 🚀 **Scalable**: Deployed as Kubernetes deployment with multiple replicas
+The application consists of:
 
-## Architecture
+1. **EFS Storage Class & PVC**: Configures Amazon EFS for persistent storage
+2. **Deployment**: Long-running pod that downloads specified files from S3 to EFS
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Users/Clients │ -> │   LoadBalancer  │ -> │   EKS Cluster   │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                                        |
-                                                        v
-                                              ┌─────────────────┐
-                                              │  Flask App Pods │
-                                              │  (Multiple)     │
-                                              └─────────────────┘
-                                                        |
-                                                        v
-                                              ┌─────────────────┐
-                                              │  EFS Volume     │
-                                              │  (/data/uploads)│
-                                              └─────────────────┘
-```
+## Components
 
-## Prerequisites
+### 1. Storage Configuration
 
-- Amazon EKS cluster
-- Amazon EFS file system configured for cross-account access
-- EFS CSI driver installed on the cluster
-- kubectl configured to access your cluster
+- **StorageClass (efs-sc)**: Configures EFS CSI driver with cross-account access
+- **PersistentVolumeClaim (efs-claim)**: Claims 5Gi of EFS storage
 
-## Deployment
+### 2. Deployment (efs-s3-downloader)
 
-### Deploy to Corebank Cluster
-
-```bash
-cd applications/unified
-./deploy-corebank.sh
-```
-
-### Deploy to Satellite Cluster
-
-```bash
-cd applications/unified
-./deploy-satellite.sh
-```
-
-### Test the Deployment
-
-```bash
-./test-upload.sh
-```
+- Uses `amazon/aws-cli:latest` image for S3 operations
+- Downloads files from a configurable S3 bucket using AWS CLI
+- Mounts EFS volume at `/data` to persist downloaded files
+- Runs continuously to keep container and files available
 
 ## Configuration
 
-The application uses the following environment variables (configured in the deployment scripts):
+### Environment Variables
 
-- `EFS_ID`: The ID of the EFS file system
-- `EFS_ROLE_ARN`: The ARN of the IAM role for EFS access
-- `CLUSTER_TYPE`: The type of cluster (corebank/satellite)
-- `APP_NAME`: The name of the application instance
+Update these variables in the deployment:
 
-## File Upload Specifications
+- `S3_BUCKET_URL`: S3 bucket name (format: "s3://your-bucket-name")
+- `FILES_TO_DOWNLOAD`: Space-separated list of files to download (e.g., "file1.txt file2.pdf image.jpg")
 
-- **Maximum file size**: 16MB per file
-- **Supported formats**:
-  - Images: PNG, JPG, JPEG, GIF
-  - Documents: PDF, DOC, DOCX, TXT, XLS, XLSX
-  - Archives: ZIP
-  - Videos: MP4, AVI, MOV
-- **Storage location**: `/data/uploads` on EFS
-- **Filename handling**: Automatic timestamping to prevent conflicts
+### Example Configuration
 
-## API Endpoints
-
-- `GET /` - Main upload interface
-- `POST /upload` - File upload endpoint
-- `GET /download/<filename>` - File download endpoint
-- `GET /health` - Health check endpoint
-
-## Local Development
-
-For local testing and development:
-
-### Using Docker Compose
-
-```bash
-# Build and run the application
-docker-compose up --build
-
-# Access the application
-open http://localhost:8080
+```yaml
+env:
+  - name: S3_BUCKET_URL
+    value: "s3://my-public-bucket"
+  - name: FILES_TO_DOWNLOAD
+    value: "document.pdf data.csv image.jpg"
 ```
 
-### Using Python directly
+## Deployment Instructions
+
+### Prerequisites
+
+1. EKS cluster with EFS CSI driver installed
+2. EFS file system created and accessible from EKS
+3. Cross-account access configured (if applicable)
+4. Update `${EFS_ID}` in the StorageClass
+
+### Step 1: Update Configuration
+
+1. Edit `efs-app.yaml` and replace `${EFS_ID}` with your actual EFS ID
+2. Update the `S3_BUCKET_URL` environment variable with your bucket name
+3. Update the `FILES_TO_DOWNLOAD` environment variable with the files you need
+
+### Step 2: Deploy the Application
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Create upload directory
-mkdir -p /data/uploads
-
-# Run the application
-python app.py
+# Deploy the application
+kubectl apply -f efs-app.yaml
 ```
 
-## Monitoring and Troubleshooting
-
-### Check Application Status
+### Step 3: Verify Deployment
 
 ```bash
+# Check pod status
 kubectl get pods -l app=efs-app
-kubectl get svc efs-app-service
-kubectl get pvc efs-claim
+
+# Check download progress
+kubectl logs -f deployment/efs-s3-downloader
+
+# Check files in EFS mount
+kubectl exec -it deployment/efs-s3-downloader -- ls -la /data/downloads/
 ```
 
-### View Logs
+## Usage
+
+### Downloading Files
+
+1. Update the `FILES_TO_DOWNLOAD` environment variable in the deployment
+2. Apply the changes: `kubectl apply -f efs-app.yaml`
+3. The pod will restart and download the specified files
+
+### Accessing Downloaded Files
 
 ```bash
-kubectl logs -l app=efs-app -f
+# List files in EFS mount
+kubectl exec -it deployment/efs-s3-downloader -- ls -la /data/downloads/
+
+# Interactive access
+kubectl exec -it deployment/efs-s3-downloader -- sh
 ```
 
-### Check EFS Mount
+## Troubleshooting
+
+### Common Issues
+
+1. **Pod stuck in pending**: Check EFS CSI driver and storage class configuration
+2. **Download failures**: Verify S3 bucket accessibility and file names
+3. **Permission denied**: Check EFS mount options and directory permissions
+
+### Debug Commands
 
 ```bash
-POD_NAME=$(kubectl get pods -l app=efs-app -o jsonpath='{.items[0].metadata.name}')
-kubectl exec $POD_NAME -- df -h /data
-kubectl exec $POD_NAME -- ls -la /data/uploads/
+# Check pod logs
+kubectl logs -f deployment/efs-s3-downloader
+
+# Access pod for debugging
+kubectl exec -it deployment/efs-s3-downloader -- sh
+
+# Check EFS mount
+kubectl exec -it deployment/efs-s3-downloader -- df -h
+
+# Test S3 access manually
+kubectl exec -it deployment/efs-s3-downloader -- aws s3 ls s3://your-bucket-name/
 ```
-
-### Port Forward for Local Access
-
-```bash
-kubectl port-forward svc/efs-app-service 8080:80
-```
-
-Then access the application at `http://localhost:8080`
 
 ## Security Considerations
 
-- File type validation prevents execution of malicious files
-- Secure filename handling prevents directory traversal attacks
-- Files are stored with timestamped names to prevent conflicts
-- Maximum file size limits prevent abuse
-- Health check endpoint for monitoring
+1. **S3 Access**: Ensure proper S3 bucket permissions (public read or appropriate IAM roles)
+2. **EFS Permissions**: Configure appropriate directory permissions (0755 by default)
+3. **Resource Limits**: Set appropriate CPU/memory limits
+4. **Network Policies**: Consider restricting network access if needed
 
-## Cleanup
+## Resource Usage
 
-To remove the application:
+The simplified application uses minimal resources:
 
-```bash
-cd applications/unified
-./cleanup.sh
+- **CPU**: 100-200m
+- **Memory**: 64-128Mi
+- **Storage**: As needed for downloaded files
+
+## Benefits of This Approach
+
+1. **Simplicity**: Simple deployment with direct S3 downloads
+2. **Lightweight**: Uses official AWS CLI image
+3. **Flexible**: Easy to modify files to download via environment variables
+4. **Persistent**: Files persist in EFS across pod restarts
+5. **Reliable**: Uses native AWS CLI for S3 operations
+6. **Cross-AZ**: EFS provides cross-availability zone access
+
+## File Access from Other Pods
+
+Other applications can access the downloaded files by mounting the same EFS PVC:
+
+```yaml
+volumeMounts:
+  - name: shared-storage
+    mountPath: /shared-data
+volumes:
+  - name: shared-storage
+    persistentVolumeClaim:
+      claimName: efs-claim
 ```
 
-Or manually:
+volumeMounts:
+volumeMounts:
 
-```bash
-kubectl delete deployment efs-file-upload-app
-kubectl delete service efs-app-service
-kubectl delete ingress efs-app-ingress
-kubectl delete pvc efs-claim
-kubectl delete configmap file-upload-app
+- name: shared-storage
+    mountPath: /shared-data
+volumes:
+- name: shared-storage
+    persistentVolumeClaim:
+      claimName: efs-claim
+
 ```
-
-## Cross-Account EFS Access
-
-This application is designed to work with cross-account EFS access between:
-
-- **Corebank Account**: Primary EFS owner
-- **Satellite Account**: Secondary account with cross-account access
-
-The deployment scripts automatically configure the appropriate IAM roles and EFS settings for each environment.
-
-## Scaling
-
-The application is deployed as a Kubernetes deployment with 2 replicas by default. You can scale it up or down:
-
-```bash
-kubectl scale deployment efs-file-upload-app --replicas=5
-```
-
-Since files are stored on EFS, all replicas share the same storage, ensuring consistency across multiple instances.
+- **After**: Simple script-based S3 file downloads
+- **Benefit**: Reduced complexity, better automation, and integration capabilities

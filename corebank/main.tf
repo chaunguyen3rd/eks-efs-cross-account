@@ -184,9 +184,32 @@ resource "aws_iam_role_policy_attachment" "efs_csi_driver" {
   role       = aws_iam_role.efs_csi_driver.name
 }
 
-# Cross-account role for satellite account access
-resource "aws_iam_role" "satellite_cross_account" {
-  name = "${var.project_name}-satellite-cross-account-role"
+# Policy to allow EFS CSI driver to assume the cross-account role
+resource "aws_iam_policy" "efs_csi_assume_cross_account" {
+  name        = "${var.project_name}-corebank-efs-csi-assume-cross-account-policy"
+  description = "Policy to allow EFS CSI driver to assume the cross-account EFS access role"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "sts:AssumeRole"
+        Resource = aws_iam_role.cross_account_efs_access.arn
+      }
+    ]
+  })
+}
+
+# Attach the assume cross-account role policy to the EFS CSI driver role
+resource "aws_iam_role_policy_attachment" "efs_csi_assume_cross_account" {
+  policy_arn = aws_iam_policy.efs_csi_assume_cross_account.arn
+  role       = aws_iam_role.efs_csi_driver.name
+}
+
+# Cross-account role for both corebank and satellite accounts to access EFS resources
+resource "aws_iam_role" "cross_account_efs_access" {
+  name = "${var.project_name}-cross-account-efs-access-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -194,7 +217,10 @@ resource "aws_iam_role" "satellite_cross_account" {
       {
         Effect = "Allow"
         Principal = {
-          AWS = "arn:aws:iam::${var.satellite_account_id}:root"
+          AWS = [
+            "arn:aws:iam::${var.satellite_account_id}:root",
+            "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+          ]
         }
         Action = "sts:AssumeRole"
       }
@@ -202,15 +228,15 @@ resource "aws_iam_role" "satellite_cross_account" {
   })
 
   tags = {
-    Name        = "${var.project_name}-satellite-cross-account-role"
-    Description = "Role for satellite account to access corebank EFS resources"
+    Name        = "${var.project_name}-cross-account-efs-access-role"
+    Description = "Role for both corebank and satellite accounts to access EFS resources"
   }
 }
 
 # Attach EFS CSI Driver policy to cross-account role
-resource "aws_iam_role_policy_attachment" "satellite_cross_account_efs" {
+resource "aws_iam_role_policy_attachment" "cross_account_efs_access" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy"
-  role       = aws_iam_role.satellite_cross_account.name
+  role       = aws_iam_role.cross_account_efs_access.name
 }
 
 # EFS File System
@@ -229,43 +255,6 @@ resource "aws_efs_file_system" "main" {
   tags = {
     Name = "${var.project_name}-corebank-efs"
   }
-}
-
-# EFS File System Policy for Cross-Account Access
-resource "aws_efs_file_system_policy" "main" {
-  file_system_id = aws_efs_file_system.main.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowCorebankFullAccess"
-        Effect = "Allow"
-        Principal = {
-          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
-        }
-        Action = [
-          "elasticfilesystem:ClientMount",
-          "elasticfilesystem:ClientWrite",
-          "elasticfilesystem:ClientRootAccess"
-        ]
-        Resource = aws_efs_file_system.main.arn
-      },
-      {
-        Sid    = "AllowSatelliteAccountAccess"
-        Effect = "Allow"
-        Principal = {
-          AWS = "arn:aws:iam::${var.satellite_account_id}:root"
-        }
-        Action = [
-          "elasticfilesystem:ClientMount",
-          "elasticfilesystem:ClientWrite",
-          "elasticfilesystem:ClientRootAccess"
-        ]
-        Resource = aws_efs_file_system.main.arn
-      }
-    ]
-  })
 }
 
 # EFS Mount Targets

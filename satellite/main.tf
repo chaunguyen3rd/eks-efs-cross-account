@@ -258,7 +258,7 @@ resource "aws_iam_policy" "assume_corebank_role" {
       {
         Effect   = "Allow"
         Action   = "sts:AssumeRole"
-        Resource = "arn:aws:iam::${var.corebank_account_id}:role/${var.project_name}-satellite-cross-account-role"
+        Resource = "arn:aws:iam::${var.corebank_account_id}:role/${var.project_name}-cross-account-efs-access-role"
       }
     ]
   })
@@ -270,40 +270,6 @@ resource "aws_iam_role_policy_attachment" "assume_corebank_role" {
   policy_arn = aws_iam_policy.assume_corebank_role.arn
 }
 
-# IAM Role for EFS CSI Node Service Account (separate from controller)
-resource "aws_iam_role" "efs_csi_node" {
-  name = "${var.project_name}-satellite-efs-csi-node-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRoleWithWebIdentity"
-        Effect = "Allow"
-        Principal = {
-          Federated = module.eks.oidc_provider_arn
-        }
-        Condition = {
-          StringEquals = {
-            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:kube-system:efs-csi-node-sa"
-            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
-          }
-        }
-      }
-    ]
-  })
-
-  tags = {
-    Name = "${var.project_name}-satellite-efs-csi-node-role"
-  }
-}
-
-# Attach AmazonElasticFileSystemClientFullAccess to the EFS CSI Node role
-resource "aws_iam_role_policy_attachment" "efs_csi_node_full_access" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonElasticFileSystemClientFullAccess"
-  role       = aws_iam_role.efs_csi_node.name
-}
-
 # Kubernetes secret for cross-account role ARN
 resource "kubernetes_secret" "x_account" {
   metadata {
@@ -312,28 +278,10 @@ resource "kubernetes_secret" "x_account" {
   }
 
   data = {
-    awsRoleArn = "arn:aws:iam::${var.corebank_account_id}:role/${var.project_name}-satellite-cross-account-role"
+    awsRoleArn = "arn:aws:iam::${var.corebank_account_id}:role/${var.project_name}-cross-account-efs-access-role"
   }
 
   type = "Opaque"
-
-  depends_on = [module.eks]
-}
-
-# Note: The efs-csi-node-sa service account is automatically created by the EKS add-on
-# We'll use kubectl to annotate it with the IAM role ARN after the cluster is created
-resource "null_resource" "annotate_efs_csi_node_sa" {
-  triggers = {
-    cluster_name = module.eks.cluster_name
-    role_arn     = aws_iam_role.efs_csi_node.arn
-  }
-
-  provisioner "local-exec" {
-    command = <<-EOT
-      aws eks update-kubeconfig --region ${var.aws_region} --name ${module.eks.cluster_name} --profile ${var.aws_profile}
-      kubectl annotate serviceaccount efs-csi-node-sa -n kube-system eks.amazonaws.com/role-arn=${aws_iam_role.efs_csi_node.arn} --overwrite
-    EOT
-  }
 
   depends_on = [module.eks]
 }

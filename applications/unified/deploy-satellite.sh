@@ -1,15 +1,15 @@
 #!/bin/bash
 
-# Deploy EFS File Upload Application to Satellite Cluster
-# This script deploys the unified file upload application to the satellite cluster
+# Deploy EFS S3 Downloader Application to Satellite Cluster
+# This script deploys the simplified S3 downloader application to the satellite cluster
 
 set -e
 
-echo "Deploying EFS File Upload Application to Satellite Cluster..."
+echo "Deploying EFS S3 Downloader Application to Satellite Cluster..."
 
 # Set cluster-specific variables
 export CLUSTER_TYPE="satellite"
-export APP_NAME="satellite-file-upload"
+export APP_NAME="satellite-s3-downloader"
 export EFS_ID="fs-041b4bd54a0879aca"
 export EFS_ROLE_ARN="arn:aws:iam::471112932773:role/banking-satellite-efs-cross-account-role"
 
@@ -24,22 +24,18 @@ envsubst < efs-app.yaml | kubectl apply -f -
 
 echo "Checking deployment status..."
 kubectl get pods -l app=efs-app
-kubectl get svc efs-app-service
 kubectl get pvc efs-claim
 
 echo "Waiting for deployment to be ready..."
-kubectl wait --for=condition=available --timeout=300s deployment/efs-file-upload-app
+kubectl wait --for=condition=available --timeout=300s deployment/efs-s3-downloader
 
-echo "Deployment completed for satellite cluster!"
+echo "✅ Deployment completed!"
 echo ""
-echo "📋 Next steps:"
-echo "  • Check deployment: kubectl get pods -l app=efs-app"
-echo "  • View logs: kubectl logs -l app=efs-app -f"
-echo "  • Get service URL: kubectl get svc efs-app-service"
-echo "  • Access the application through the LoadBalancer endpoint"
+echo "To check downloaded files:"
+echo "  kubectl exec -it deployment/efs-s3-downloader -- ls -la /data/downloads/"
 echo ""
-echo "📁 Application Features:"
-echo "  • Upload multiple files (images, documents, videos)"
-echo "  • View uploaded files with metadata"
-echo "  • Download files"
-echo "  • Files stored on EFS for persistence and cross-AZ availability"
+echo "To access the container:"
+echo "  kubectl exec -it deployment/efs-s3-downloader -- sh"
+echo ""
+echo "To check logs:"
+echo "  kubectl logs -f deployment/efs-s3-downloader"

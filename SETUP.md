@@ -123,7 +123,7 @@ aws eks list-clusters --profile satellite --region us-west-2
 
 ```bash
 # Connect to corebank cluster
-aws eks update-kubeconfig --region ap-northeast-2 --name banking-platform-corebank-eks --profile corebank
+aws eks update-kubeconfig --region ap-northeast-2 --name banking-corebank-eks --profile corebank
 kubectl get pods -l app=efs-writer
 kubectl logs -l app=efs-writer -f
 
