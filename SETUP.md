@@ -4,7 +4,7 @@
 
 ### 1. AWS Accounts Setup
 
-- Two AWS accounts: one for "corebank" and one for "satellite"
+- Two AWS accounts: one for **corebank** and one for **satellite**
 - Administrative access to both accounts
 - Cross-account trust relationships configured
 
@@ -20,41 +20,36 @@
 Configure AWS CLI profiles for both accounts:
 
 ```bash
-# Configure corebank account
 aws configure --profile corebank
-# Enter Access Key ID, Secret Key, and region (e.g., us-west-2)
-
-# Configure satellite account
 aws configure --profile satellite
-# Enter Access Key ID, Secret Key, and region (e.g., us-west-2)
 ```
 
 ### 4. IAM Permissions
 
-Both accounts need the following permissions:
+Both accounts need permissions for:
 
-- EKS full access
-- VPC full access
-- EFS full access
+- EKS, VPC, EFS, EC2 full access
 - IAM role creation and management
-- EC2 full access
+
+---
 
 ## Configuration Steps
 
-### 1. Corebank Account Configuration
+### 1. Corebank Account Setup
 
 1. Copy `corebank/terraform.tfvars.example` to `corebank/terraform.tfvars`
-2. Update the following values:
+2. Update values for your environment:
 
    ```hcl
    aws_region  = "us-west-2"  # Your preferred region
    aws_profile = "corebank"   # Your AWS profile name
-   satellite_account_id = "123456789012"  # Satellite AWS account ID
+   environment  = "production"
+   project_name = "banking-platform"
+   satellite_account_id = "123456789012"  # Replace with actual satellite account ID
+   satellite_vpc_cidr   = "10.1.0.0/16"
    ```
 
-### 2. Initial Deployment
-
-First, deploy only the corebank infrastructure:
+3. Deploy corebank infrastructure:
 
 ```bash
 cd corebank
@@ -63,13 +58,13 @@ terraform plan
 terraform apply
 ```
 
-Note the following outputs:
+**Note the following outputs:**
 
 - `vpc_id`
 - `vpc_peering_connection_id`
 - `efs_id`
 
-### 3. Satellite Account Configuration
+### 2. Satellite Account Setup
 
 1. Copy `satellite/terraform.tfvars.example` to `satellite/terraform.tfvars`
 2. Update with values from corebank deployment:
@@ -77,14 +72,15 @@ Note the following outputs:
    ```hcl
    aws_region  = "us-west-2"  # Same region as corebank
    aws_profile = "satellite"  # Your AWS profile name
-   corebank_account_id = "987654321098"  # Corebank AWS account ID
-   corebank_peering_connection_id = "pcx-xxxxx"  # From corebank output
-   corebank_efs_id = "fs-xxxxx"  # From corebank output
+   environment  = "production"
+   project_name = "banking-platform"
+   corebank_account_id           = "987654321098"  # Replace with actual corebank account ID
+   corebank_vpc_cidr            = "10.0.0.0/16"
+   corebank_peering_connection_id = "pcx-xxxxxxxxx" # From corebank output
+   corebank_efs_id              = "fs-xxxxxxxxx"   # From corebank output
    ```
 
-### 4. Complete Deployment
-
-Deploy satellite infrastructure:
+3. Deploy satellite infrastructure:
 
 ```bash
 cd satellite
@@ -93,18 +89,43 @@ terraform plan
 terraform apply
 ```
 
-### 5. Application Deployment
+### 3. Application Deployment
 
-Deploy the applications to both clusters:
+#### Unified Application
+
+The unified application is a simplified EFS S3 downloader that demonstrates downloading files from a public S3 bucket to an Amazon EFS mount using AWS CLI.
+
+1. Navigate to the applications directory:
+
+   ```bash
+   cd applications/unified
+   ```
+
+2. Configure the application by editing `efs-app.yaml`:
+   - Update `S3_BUCKET_URL` environment variable with your S3 bucket
+   - Update `FILES_TO_DOWNLOAD` with space-separated list of files to download
+
+3. Deploy the application to your EKS cluster:
+
+   ```bash
+   # Connect to your cluster first
+   aws eks update-kubeconfig --region <region> --name <cluster-name> --profile <profile>
+   
+   # Deploy the application
+   kubectl apply -f efs-app.yaml
+   ```
+
+#### Alternative Deployment Scripts
+
+You can also use the provided deployment scripts:
 
 ```bash
-# Deploy writer app to corebank
-cd applications/writer
-./deploy.sh
+# Deploy to corebank cluster
+cd applications/unified
+./deploy-corebank.sh
 
-# Deploy reader app to satellite
-cd ../reader
-./deploy.sh
+# Deploy to satellite cluster
+./deploy-satellite.sh
 ```
 
 ## Verification
@@ -113,29 +134,51 @@ cd ../reader
 
 ```bash
 # Corebank cluster
-aws eks list-clusters --profile corebank --region us-west-2
+aws eks list-clusters --profile corebank --region <region>
 
 # Satellite cluster
-aws eks list-clusters --profile satellite --region us-west-2
+aws eks list-clusters --profile satellite --region <region>
 ```
 
-### Check Applications
+### Check Application Pods
 
 ```bash
-# Connect to corebank cluster
-aws eks update-kubeconfig --region ap-northeast-2 --name banking-corebank-eks --profile corebank
-kubectl get pods -l app=efs-writer
-kubectl logs -l app=efs-writer -f
+# Update kubeconfig for your cluster
+aws eks update-kubeconfig --region <region> --name <cluster-name> --profile <profile>
 
-# Connect to satellite cluster
-aws eks update-kubeconfig --region ap-northeast-2 --name banking-satellite-eks --profile satellite
-kubectl get pods -l app=efs-reader
-kubectl logs -l app=efs-reader -f
+# Check pods
+kubectl get pods
+kubectl get pvc
+kubectl get storageclass
+
+# Check logs
+kubectl logs -l app=efs-s3-downloader
 ```
 
 ### Verify Cross-Account EFS Access
 
-The reader application in the satellite account should be able to read files written by the writer application in the corebank account.
+Files downloaded by the unified application in one account should be accessible via the EFS mount in the other account, demonstrating successful cross-account EFS sharing.
+
+## Cleanup
+
+To clean up resources, use the provided cleanup script:
+
+```bash
+cd applications/unified
+./cleanup.sh
+```
+
+Then destroy Terraform infrastructure in reverse order:
+
+```bash
+# Destroy satellite infrastructure first
+cd satellite
+terraform destroy
+
+# Then destroy corebank infrastructure
+cd ../corebank
+terraform destroy
+```
 
 ## Troubleshooting
 
@@ -169,4 +212,7 @@ aws ec2 describe-vpc-peering-connections --profile corebank
 # Debug Kubernetes issues
 kubectl describe pod <pod-name>
 kubectl get events --sort-by=.metadata.creationTimestamp
+
+# Check EFS CSI driver
+kubectl get pods -n kube-system | grep efs-csi
 ```

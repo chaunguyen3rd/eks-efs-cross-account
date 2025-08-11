@@ -8,6 +8,7 @@ set -e
 echo "Deploying EFS S3 Downloader Application to Satellite Cluster..."
 
 # Set cluster-specific variables
+# Change this value
 export CLUSTER_TYPE="satellite"
 export APP_NAME="efs-s3-downloader"
 export EFS_ID="fs-0f9767477ea91786e"

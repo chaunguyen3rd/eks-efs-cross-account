@@ -51,6 +51,8 @@ spec:
               echo "Starting S3 file download to EFS mount..."
 
               echo "Downloading files..."
+
+              # Change this value 
               aws s3 cp s3://core-efs-eks-cross-account-public-bucket/21m.011-fall-2024/ /data/ --recursive --no-sign-request
 
               echo "Download process completed!"

@@ -1,11 +1,10 @@
 # Project Structure
 
-```
+```text
 eks-terraform/
 ├── README.md                           # Project overview and architecture
 ├── SETUP.md                           # Detailed setup and troubleshooting guide
-├── deploy.sh                          # Master deployment script
-├── cleanup.sh                         # Master cleanup script
+├── STRUCTURE.md                       # This file - project structure documentation
 ├── corebank/                          # Corebank account infrastructure
 │   ├── main.tf                        # Main Terraform configuration
 │   ├── variables.tf                   # Variable definitions
@@ -16,13 +15,16 @@ eks-terraform/
 │   ├── variables.tf                   # Variable definitions
 │   ├── outputs.tf                     # Output values
 │   └── terraform.tfvars.example       # Example configuration file
-└── applications/                      # Kubernetes applications
-    ├── writer/                        # EFS writer application (corebank)
-    │   ├── efs-writer.yaml            # Kubernetes manifests
-    │   └── deploy.sh                  # Deployment script
-    └── reader/                        # EFS reader application (satellite)
-        ├── efs-reader.yaml            # Kubernetes manifests
-        └── deploy.sh                  # Deployment script
+├── applications/                      # Kubernetes applications
+│   └── unified/                       # Unified EFS S3 downloader application
+│       ├── efs-app.yaml              # Kubernetes manifests (StorageClass, PVC, Deployment)
+│       ├── deploy-corebank.sh        # Deployment script for corebank cluster
+│       ├── deploy-satellite.sh       # Deployment script for satellite cluster
+│       ├── cleanup.sh                # Application cleanup script
+│       └── README.md                 # Application documentation
+└── diagrams/                          # Architecture diagrams
+    ├── cross-account-efs-simplified.png
+    └── network-flow-simplified.png
 ```
 
 ## Key Features
@@ -35,7 +37,7 @@ eks-terraform/
    - VPC with public/private subnets
    - VPC peering connection to satellite account
    - Security groups for EFS access
-   - IAM roles for EFS CSI driver
+   - IAM roles for EFS CSI driver and cross-account access
 
 2. **Satellite Account**:
    - EKS cluster with managed node groups
@@ -43,25 +45,32 @@ eks-terraform/
    - VPC peering connection acceptance
    - Cross-account IAM role for EFS access
    - Security groups for EFS client access
+   - Route table updates for cross-VPC communication
 
 ### Application Components
 
-1. **Writer Application (Corebank)**:
-   - Writes log files and test data to EFS
-   - Uses EFS CSI driver for dynamic provisioning
-   - Runs continuously with 30-second intervals
+1. **Unified EFS S3 Downloader Application**:
+   - Downloads files from public S3 bucket to EFS mount
+   - Uses AWS CLI (`amazon/aws-cli:latest` image)
+   - Demonstrates cross-account EFS access
+   - Configurable S3 bucket and file list via environment variables
+   - Persistent storage using Amazon EFS
+   - Can be deployed to either corebank or satellite clusters
 
-2. **Reader Application (Satellite)**:
-   - Reads files from corebank EFS via cross-account access
-   - Monitors and displays EFS contents
-   - Demonstrates cross-VPC file system access
+### Kubernetes Resources
+
+The unified application creates:
+
+- **StorageClass** (`efs-sc`): Configures EFS CSI driver with cross-account access
+- **PersistentVolumeClaim** (`efs-claim`): Claims 5Gi of EFS storage
+- **Deployment** (`efs-s3-downloader`): Long-running pod that downloads and persists files
 
 ### Network Architecture
 
-- **VPC Peering**: Enables communication between accounts
-- **Security Groups**: Control NFS traffic (port 2049)
+- **VPC Peering**: Enables communication between corebank and satellite accounts
+- **Security Groups**: Control NFS traffic (port 2049) for EFS access
 - **Route Tables**: Updated for cross-VPC routing
-- **EFS Mount Targets**: Available in all private subnets
+- **EFS Mount Targets**: Available in all private subnets across both accounts
 
 ### Security Features
 
@@ -69,75 +78,122 @@ eks-terraform/
 - **Cross-Account Policies**: Controlled access to EFS from satellite account
 - **Encrypted EFS**: Data encryption at rest and in transit
 - **VPC Security**: Private subnets for EKS nodes
+- **Cross-Account Secrets**: Secure credential sharing for EFS CSI driver
 
 ## Quick Start
 
 1. **Configure AWS Profiles**:
+
    ```bash
    aws configure --profile corebank
    aws configure --profile satellite
    ```
 
 2. **Setup Configuration**:
+
    ```bash
    cp corebank/terraform.tfvars.example corebank/terraform.tfvars
-   # Edit corebank/terraform.tfvars with your values
+   cp satellite/terraform.tfvars.example satellite/terraform.tfvars
+   # Edit both terraform.tfvars files with your values
    ```
 
-3. **Deploy Everything**:
+3. **Deploy Infrastructure**:
+
    ```bash
-   ./deploy.sh
+   # Deploy corebank first
+   cd corebank
+   terraform init && terraform apply
+   
+   # Note the outputs, then deploy satellite
+   cd ../satellite
+   terraform init && terraform apply
    ```
 
-4. **Monitor Applications**:
-   ```bash
-   # Writer logs (corebank)
-   aws eks update-kubeconfig --region us-west-2 --name banking-platform-corebank-eks --profile corebank
-   kubectl logs -l app=efs-writer -f
+4. **Deploy Application**:
 
-   # Reader logs (satellite)
-   aws eks update-kubeconfig --region us-west-2 --name banking-platform-satellite-eks --profile satellite
-   kubectl logs -l app=efs-reader -f
+   ```bash
+   cd applications/unified
+   
+   # Configure efs-app.yaml with your S3 bucket and files
+   # Deploy to corebank cluster
+   ./deploy-corebank.sh
+   
+   # Or deploy to satellite cluster
+   ./deploy-satellite.sh
    ```
 
-5. **Cleanup**:
+5. **Monitor Application**:
+
    ```bash
+   # Check pods and logs
+   kubectl get pods
+   kubectl logs -l app=efs-s3-downloader -f
+   
+   # Verify downloaded files
+   kubectl exec -it <pod-name> -- ls -la /data
+   ```
+
+6. **Cleanup**:
+
+   ```bash
+   cd applications/unified
    ./cleanup.sh
+   
+   # Then destroy infrastructure
+   cd ../../satellite && terraform destroy
+   cd ../corebank && terraform destroy
    ```
 
 ## Customization
 
 ### Network Configuration
-- Modify CIDR blocks in `terraform.tfvars` files
+
+- Modify CIDR blocks in `terraform.tfvars` files to avoid conflicts
 - Adjust subnet configurations in `variables.tf`
+- Update security group rules for additional ports if needed
 
 ### EKS Configuration
-- Change instance types in `main.tf`
-- Modify node group sizing
-- Add additional managed node groups
+
+- Change instance types in `main.tf` for cost optimization
+- Modify node group sizing based on workload requirements
+- Add additional managed node groups for different workload types
 
 ### Application Configuration
-- Customize container images
-- Modify resource requests/limits
-- Add health checks and monitoring
+
+- Update `S3_BUCKET_URL` environment variable in `efs-app.yaml`
+- Modify `FILES_TO_DOWNLOAD` list for different files
+- Adjust resource requests/limits based on file sizes
+- Add health checks and readiness probes
 
 ### Security Configuration
-- Adjust security group rules
-- Modify IAM policies
-- Configure additional RBAC rules
+
+- Adjust security group rules for additional services
+- Modify IAM policies for least privilege access
+- Configure additional RBAC rules for different teams
+
+## Cross-Account Architecture Benefits
+
+1. **Data Isolation**: Corebank data remains in controlled account
+2. **Access Control**: Granular permissions for satellite account access
+3. **Network Segmentation**: Separate VPCs with controlled peering
+4. **Compliance**: Meets regulatory requirements for data separation
+5. **Scalability**: Easy to add more satellite accounts or applications
 
 ## Cost Optimization
 
 - Use Spot instances for non-production workloads
-- Implement cluster autoscaling
-- Use EFS Infrequent Access storage class
-- Configure appropriate EFS throughput mode
+- Implement cluster autoscaling for dynamic node management
+- Use EFS Infrequent Access storage class for rarely accessed files
+- Configure appropriate EFS throughput mode (provisioned vs bursting)
+- Use smaller instance types for lightweight applications
 
 ## Monitoring and Logging
 
 Consider adding:
-- CloudWatch Container Insights
-- EFS performance monitoring
-- VPC Flow Logs
+
+- CloudWatch Container Insights for EKS monitoring
+- EFS performance monitoring and CloudWatch metrics
+- VPC Flow Logs for network traffic analysis
 - AWS X-Ray for application tracing
-- Prometheus and Grafana for metrics
+- Prometheus and Grafana for custom metrics
+- CloudTrail for API call auditing
